@@ -128,6 +128,7 @@ const InvoiceForPayment = () => {
             alert('Пожалуйста, исправьте ошибки в форме')
             return
         }
+        onSendData().then()
     }
 
     const handleInputChange = (

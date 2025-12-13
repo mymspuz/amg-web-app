@@ -31,7 +31,7 @@ const MainMenu = () => {
         <>
             <div className="telegram-container">
                 <div className="header">
-                    <h1>AMG</h1>
+                    <h1>AMG123</h1>
                     <h3>Пользователь</h3>
                 </div>
 
