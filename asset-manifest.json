@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/amg-web-app/static/css/main.e3833723.css",
-    "main.js": "/amg-web-app/static/js/main.cb05d4b4.js",
+    "main.js": "/amg-web-app/static/js/main.d4c9184b.js",
     "static/js/453.adfc755f.chunk.js": "/amg-web-app/static/js/453.adfc755f.chunk.js",
     "index.html": "/amg-web-app/index.html",
     "main.e3833723.css.map": "/amg-web-app/static/css/main.e3833723.css.map",
-    "main.cb05d4b4.js.map": "/amg-web-app/static/js/main.cb05d4b4.js.map",
+    "main.d4c9184b.js.map": "/amg-web-app/static/js/main.d4c9184b.js.map",
     "453.adfc755f.chunk.js.map": "/amg-web-app/static/js/453.adfc755f.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e3833723.css",
-    "static/js/main.cb05d4b4.js"
+    "static/js/main.d4c9184b.js"
   ]
 }
