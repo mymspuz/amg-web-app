@@ -95,7 +95,8 @@ const InvoiceForPayment = () => {
         }
     }
 
-    const handleAddNewItem = () => {
+    const handleAddNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation()
         const lastId = formData?.items?.length ? formData.items[formData.items.length - 1].id : 0
         const copyItems = formData?.items?.length ? [...formData.items] : []
         copyItems.push({ id: lastId + 1, name: newItem.name, amount: newItem.amount, price: newItem.price })
@@ -103,7 +104,8 @@ const InvoiceForPayment = () => {
         setNewItem({ id: 0, name: '', price: 1, amount: 1})
     }
 
-    const handleEditNewItem = () => {
+    const handleEditNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation()
         const copyItems = formData?.items?.length ? [...formData.items] : []
         copyItems.forEach(i => {
             if (i.id === selectedItem.id) {
@@ -115,20 +117,21 @@ const InvoiceForPayment = () => {
         setFormData({ ...formData, items: copyItems })
     }
 
-    const handleRemoveNewItem = () => {
+    const handleRemoveNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation()
         const copyItems = formData.items.filter(i => i.id !== selectedItem.id)
         setFormData({ ...formData, items: copyItems })
         setNewItem({ id: 0, name: '', price: 1, amount: 1})
     }
 
     const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
-        e.preventDefault()
-
-        if (!validateForm()) {
-            alert('Пожалуйста, исправьте ошибки в форме')
-            return
-        }
-        onSendData().then()
+        // e.preventDefault()
+        //
+        // if (!validateForm()) {
+        //     alert('Пожалуйста, исправьте ошибки в форме')
+        //     return
+        // }
+        // onSendData().then()
     }
 
     const handleInputChange = (
@@ -157,6 +160,8 @@ const InvoiceForPayment = () => {
     }
 
     const validateForm = (): boolean => {
+        if (!Object.keys(formData).length) return false
+
         const newErrors: IFormErrors = {} as IFormErrors
 
         if (!formData.buyerName.trim().length) {
@@ -230,6 +235,23 @@ const InvoiceForPayment = () => {
             tg.offEvent('mainButtonClicked', onSendData)
         }
     }, [onSendData])
+
+    useEffect(() => {
+        validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
+    }, [formData])
+
+    useEffect(() => {
+        tg.onEvent('mainButtonClicked', onSendData)
+        return () => {
+            tg.offEvent('mainButtonClicked', onSendData)
+        }
+    }, [onSendData])
+
+    useEffect(() => {
+        tg.MainButton.setParams({
+            text: 'Отправить данные'
+        })
+    }, [])
 
     return (
         <div className="form-container">
@@ -401,6 +423,9 @@ const InvoiceForPayment = () => {
 
                     <div className="input-row">
                         <div className="input-group half">
+                            <label htmlFor="itemAmount" className="required">
+                                Количество
+                            </label>
                             <input
                                 id="itemAmount"
                                 type="number"
@@ -414,6 +439,9 @@ const InvoiceForPayment = () => {
                             />
                         </div>
                         <div className="input-group half">
+                            <label htmlFor="itemPrice" className="required">
+                                Цена
+                            </label>
                             <input
                                 id="itemPrice"
                                 type="number"
@@ -428,12 +456,13 @@ const InvoiceForPayment = () => {
                         </div>
                     </div>
 
-                    <div className="input-group" style={{display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                        {permittedOperations !== 'none' &&
+                    <div className="input-group" style={{display: 'flex', justifyContent: 'center', gap: '5px'}}>
+                    {permittedOperations !== 'none' &&
                             <button
                                 id="buttonAddItem"
                                 className="tg-button secondary"
-                                onClick={handleAddNewItem}
+                                style={{fontSize: '14px'}}
+                                onClick={(e) => handleAddNewItem(e)}
                             >
                                 Добавить
                             </button>
@@ -443,14 +472,16 @@ const InvoiceForPayment = () => {
                                 <button
                                     id="buttonEditItem"
                                     className="tg-button primary"
-                                    onClick={handleEditNewItem}
+                                    style={{fontSize: '14px'}}
+                                    onClick={(e) => handleEditNewItem(e)}
                                 >
                                     Изменить
                                 </button>
                                 <button
                                     id="buttonRemoveItem"
                                     className="tg-button danger"
-                                    onClick={handleRemoveNewItem}
+                                    style={{fontSize: '14px'}}
+                                    onClick={(e) => handleRemoveNewItem(e)}
                                 >
                                     Удалить
                                 </button>
@@ -460,14 +491,14 @@ const InvoiceForPayment = () => {
                 </fieldset>
 
                 {/* Кнопки действий */}
-                <div className="form-actions">
-                    {/*<button type="button" className="btn-secondary" onClick={handleBack}>*/}
-                    {/*    Отмена*/}
-                    {/*</button>*/}
-                    <button type="submit" className="btn-primary">
-                        Создать документ
-                    </button>
-                </div>
+                {/*<div className="form-actions">*/}
+                {/*    /!*<button type="button" className="btn-secondary" onClick={handleBack}>*!/*/}
+                {/*    /!*    Отмена*!/*/}
+                {/*    /!*</button>*!/*/}
+                {/*    <button type="submit" className="btn-primary">*/}
+                {/*        Создать документ*/}
+                {/*    </button>*/}
+                {/*</div>*/}
             </form>
         </div>
     )
