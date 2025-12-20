@@ -96,7 +96,7 @@ const InvoiceForPayment = () => {
         buyerPhone: null,
         counterpartyId: counterpartyId,
         items: [],
-        fromFile: fromFile ? fromFile === 'true' : false
+        fromFile: fromFile ? fromFile == '1' : false
     } as IFormData)
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1})
