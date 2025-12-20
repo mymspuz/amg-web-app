@@ -1,4 +1,4 @@
-import React, {useState, FormEvent, ChangeEvent, useEffect, useCallback} from 'react'
+import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useTelegram } from '../../hooks/useTelegram'
@@ -134,7 +134,7 @@ const InvoiceForPayment = () => {
         }
     }
 
-    const handleAddNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleAddNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         const lastId = formData?.items?.length ? formData.items[formData.items.length - 1].id : 0
         const copyItems = formData?.items?.length ? [...formData.items] : []
@@ -144,7 +144,7 @@ const InvoiceForPayment = () => {
         setBuyerItemsSelected(-1)
     }
 
-    const handleEditNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleEditNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         const copyItems = formData?.items?.length ? [...formData.items] : []
         copyItems.forEach(i => {
@@ -157,7 +157,7 @@ const InvoiceForPayment = () => {
         setFormData({ ...formData, items: copyItems })
     }
 
-    const handleRemoveNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleRemoveNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         const copyItems = formData.items.filter(i => i.id !== selectedItem.id)
         setFormData({ ...formData, items: copyItems })
@@ -217,7 +217,7 @@ const InvoiceForPayment = () => {
         if (!formData.fromFile && !formData?.items?.length) {
             newErrors.items = 'Нет ни одной строчки товаров/услуг'
         }
-        console.log('newErrors', newErrors)
+
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
@@ -275,7 +275,6 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         if (formData?.items?.length) setErrors({ ...errors, items: '' })
-        console.log('formData - ', formData)
         validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
     }, [formData])
 
@@ -310,7 +309,7 @@ const InvoiceForPayment = () => {
             <form className="adaptive-form">
                 {/* Основная информация */}
                 <fieldset className="form-section">
-                    <legend>👤 Покупатель {fromFile} - {`${formData.fromFile}`}</legend>
+                    <legend>👤 Покупатель</legend>
 
                     <div className="input-group">
                         <label htmlFor="buyer" className="required">
@@ -519,48 +518,38 @@ const InvoiceForPayment = () => {
 
                         <div className="input-group" style={{display: 'flex', justifyContent: 'center', gap: '5px'}}>
                             {permittedOperations !== 'none' &&
-                                <button
+                                <input
+                                    type={'button'}
                                     id="buttonAddItem"
                                     className="tg-button secondary"
                                     style={{fontSize: '14px'}}
                                     onClick={(e) => handleAddNewItem(e)}
-                                >
-                                    Добавить
-                                </button>
+                                    value={'Добавить'}
+                                />
                             }
                             {permittedOperations === 'edit' &&
                                 <>
-                                    <button
+                                    <input
                                         id="buttonEditItem"
+                                        type={'button'}
                                         className="tg-button primary"
                                         style={{fontSize: '14px'}}
                                         onClick={(e) => handleEditNewItem(e)}
-                                    >
-                                        Изменить
-                                    </button>
-                                    <button
+                                        value={'Изменить'}
+                                    />
+                                    <input
                                         id="buttonRemoveItem"
+                                        type={'button'}
                                         className="tg-button danger"
                                         style={{fontSize: '14px'}}
                                         onClick={(e) => handleRemoveNewItem(e)}
-                                    >
-                                        Удалить
-                                    </button>
+                                        value={'Удалить'}
+                                    />
                                 </>
                             }
                         </div>
                     </fieldset>
                 }
-
-                {/* Кнопки действий */}
-                {/*<div className="form-actions">*/}
-                {/*    /!*<button type="button" className="btn-secondary" onClick={handleBack}>*!/*/}
-                {/*    /!*    Отмена*!/*/}
-                {/*    /!*</button>*!/*/}
-                {/*    <button type="submit" className="btn-primary">*/}
-                {/*        Создать документ*/}
-                {/*    </button>*/}
-                {/*</div>*/}
             </form>
         </div>
     )

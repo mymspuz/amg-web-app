@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
-import {useNavigate, useSearchParams} from 'react-router-dom'
-
-import { useTelegram } from '../../hooks/useTelegram'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import './MainMenu.css'
 
@@ -33,7 +31,7 @@ const MainMenu = () => {
         <>
             <div className="telegram-container">
                 <div className="header">
-                    <h1>AMG123</h1>
+                    <h1>AMG</h1>
                     <h3>Пользователь</h3>
                 </div>
 
