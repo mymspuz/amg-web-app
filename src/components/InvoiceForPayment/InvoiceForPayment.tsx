@@ -214,7 +214,7 @@ const InvoiceForPayment = () => {
             newErrors.buyerAddress = 'Адрес обязательно к заполнению'
         }
 
-        if (!fromFile && !formData?.items?.length) {
+        if (formData.fromFile && !formData?.items?.length) {
             newErrors.items = 'Нет ни одной строчки товаров/услуг'
         }
 
