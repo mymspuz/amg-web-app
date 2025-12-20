@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import {useNavigate, useSearchParams} from 'react-router-dom'
 
 import { useTelegram } from '../../hooks/useTelegram'
 
@@ -11,6 +11,8 @@ const MainMenu = () => {
     const [counterparty, setCounterparty] = useState<number>(counterparties[0].id)
 
     const navigate = useNavigate()
+    const [search, setSearch] = useSearchParams()
+    const fromFile = Number(search.get('fromFile'))
 
     function onChangeCounterparty(e: { target: { value: any } }) {
         setCounterparty(Number(e.target.value))
@@ -54,7 +56,7 @@ const MainMenu = () => {
                     <button
                         id="buttonTaskMenu"
                         className="tg-button primary"
-                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}`)}
+                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${(!!fromFile)}`)}
                     >
                         📝 Создать счет
                     </button>

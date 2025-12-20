@@ -22,6 +22,7 @@ interface IFormData {
     buyerPhone: string | null
     counterpartyId: number
     items: IItem[]
+    fromFile: boolean
 }
 
 interface IFormErrors {
@@ -47,7 +48,8 @@ interface ICounterparty {
         bik: string
         check1: string
         check2: string
-    }
+    },
+    items: string[]
 }
 
 type TPermittedOperations = 'none' | 'add' | 'edit'
@@ -60,15 +62,51 @@ const InvoiceForPayment = () => {
     const navigate = useNavigate()
     const [search, setSearch] = useSearchParams()
     const counterpartyId = Number(search.get('counterparty'))
+    const fromFile = search.get('fromFile')
+    if (!counterparties.find(i => i.id === 0)) {
+        counterparties.push({
+            id: 0,
+            name: 'Ввести вручную',
+            phone: null,
+            kpp: 0,
+            address: '',
+            ind: 0,
+            inn: 0,
+            bank: {
+                name: '',
+                bik: '',
+                check1: '',
+                check2: ''
+            },
+            items: []
+        })
+    }
+
     const counterparty: ICounterparty = counterparties.find(i => i.id === counterpartyId) ? counterparties.filter(i => i.id === counterpartyId)[0] : {} as ICounterparty
     const [buyer, setBuyer] = useState<number>(counterparties[0].id)
-    const [formData, setFormData] = useState<IFormData>({} as IFormData)
+    const [buyerItems, setBuyerItems] = useState<{ id: number, label: string }[]>([])
+    const [buyerItemsSelected, setBuyerItemsSelected] = useState<number>(-1)
+    const [formData, setFormData] = useState<IFormData>({
+        buyerName: '',
+        buyerInn: 0,
+        buyerKpp: 0,
+        buyerInd: 0,
+        buyerAddress: '',
+        buyerPhone: null,
+        counterpartyId: counterpartyId,
+        items: [],
+        fromFile: fromFile ? fromFile === 'true' : false
+    } as IFormData)
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1})
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
 
     function onChangeBuyer(e: { target: { value: any } }) {
         setBuyer(Number(e.target.value))
+    }
+
+    function onChangeBuyerItems(e: { target: { value: any } }) {
+        setBuyerItemsSelected(Number(e.target.value))
     }
 
     function handleItemNameChange(e: ChangeEvent<HTMLInputElement>) {
@@ -102,6 +140,7 @@ const InvoiceForPayment = () => {
         copyItems.push({ id: lastId + 1, name: newItem.name, amount: newItem.amount, price: newItem.price })
         setFormData({ ...formData, items: copyItems })
         setNewItem({ id: 0, name: '', price: 1, amount: 1})
+        setBuyerItemsSelected(-1)
     }
 
     const handleEditNewItem = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -122,16 +161,6 @@ const InvoiceForPayment = () => {
         const copyItems = formData.items.filter(i => i.id !== selectedItem.id)
         setFormData({ ...formData, items: copyItems })
         setNewItem({ id: 0, name: '', price: 1, amount: 1})
-    }
-
-    const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
-        // e.preventDefault()
-        //
-        // if (!validateForm()) {
-        //     alert('Пожалуйста, исправьте ошибки в форме')
-        //     return
-        // }
-        // onSendData().then()
     }
 
     const handleInputChange = (
@@ -184,7 +213,7 @@ const InvoiceForPayment = () => {
             newErrors.buyerAddress = 'Адрес обязательно к заполнению'
         }
 
-        if (!formData?.items?.length) {
+        if (!fromFile && !formData?.items?.length) {
             newErrors.items = 'Нет ни одной строчки товаров/услуг'
         }
 
@@ -202,6 +231,13 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         const selectedBuyer = counterparties.filter(b => b.id === buyer)[0]
+        const res = selectedBuyer.items.map((i, ind) => ({ id: ind, label: i }))
+        res.unshift({ id: -1, label: '' })
+        setBuyerItems(res)
+    }, [buyer])
+
+    useEffect(() => {
+        const selectedBuyer = counterparties.filter(b => b.id === buyer)[0]
         setFormData({
             ...formData,
             buyerName: selectedBuyer.name,
@@ -211,7 +247,18 @@ const InvoiceForPayment = () => {
             buyerAddress: selectedBuyer.address,
             buyerPhone: selectedBuyer.phone
         })
-    }, [buyer])
+    }, [buyerItems])
+
+    useEffect(() => {
+        if (buyerItemsSelected !== undefined) {
+            if (buyerItemsSelected !== -1) {
+                const selectedBuyerItem = buyerItems.filter(b => b.id === buyerItemsSelected)[0]
+                setNewItem({ ...newItem, name: selectedBuyerItem.label })
+            } else {
+                if (newItem) setNewItem({ ...newItem, name: '' })
+            }
+        }
+    }, [buyerItemsSelected])
 
     useEffect(() => {
         if (selectedItem.id !== undefined) setNewItem(selectedItem)
@@ -227,16 +274,6 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         if (formData?.items?.length) setErrors({ ...errors, items: '' })
-    }, [formData])
-
-    useEffect(() => {
-        tg.onEvent('mainButtonClicked', onSendData)
-        return () => {
-            tg.offEvent('mainButtonClicked', onSendData)
-        }
-    }, [onSendData])
-
-    useEffect(() => {
         validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
     }, [formData])
 
@@ -268,7 +305,7 @@ const InvoiceForPayment = () => {
                 <p>Заполните форму для создания нового счета от {counterparty.name}</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="adaptive-form">
+            <form className="adaptive-form">
                 {/* Основная информация */}
                 <fieldset className="form-section">
                     <legend>👤 Покупатель</legend>
@@ -288,107 +325,112 @@ const InvoiceForPayment = () => {
                             ))}
                         </select>
                     </div>
+                    {buyer === 0 &&
+                        <>
+                            <div className="input-group">
+                                <label htmlFor="buyerName" className="required">
+                                    Наименование
+                                </label>
+                                <input
+                                    id="buyerName"
+                                    type="text"
+                                    value={formData.buyerName}
+                                    onChange={handleTextInputChange}
+                                    placeholder="ООО Техно"
+                                    required
+                                    className={errors.buyerName ? 'error' : ''}
+                                />
+                                {errors.buyerName && <span className="error-message">{errors.buyerName}</span>}
+                            </div>
 
-                    <div className="input-group">
-                        <label htmlFor="buyerName" className="required">
-                            Наименование
-                        </label>
-                        <input
-                            id="buyerName"
-                            type="text"
-                            value={formData.buyerName}
-                            onChange={handleTextInputChange}
-                            placeholder="ООО Техно"
-                            required
-                            className={errors.buyerName ? 'error' : ''}
-                        />
-                        {errors.buyerName && <span className="error-message">{errors.buyerName}</span>}
-                    </div>
+                            <div className="input-row">
+                                <div className="input-group half">
+                                    <label htmlFor="buyerInn" className="required">
+                                        ИНН
+                                    </label>
+                                    <input
+                                        id="buyerInn"
+                                        type="number"
+                                        value={formData.buyerInn}
+                                        onChange={handleTextInputChange}
+                                        placeholder="ИНН"
+                                        required
+                                        className={errors.buyerInn ? 'error' : ''}
+                                    />
+                                    {errors.buyerInn && <span className="error-message">{errors.buyerInn}</span>}
+                                </div>
+                                <div className="input-group half">
+                                    <label htmlFor="buyerKpp" className="required">
+                                        КПП
+                                    </label>
+                                    <input
+                                        id="buyerKpp"
+                                        type="number"
+                                        value={formData.buyerKpp}
+                                        onChange={handleTextInputChange}
+                                        placeholder="КПП"
+                                        required
+                                        className={errors.buyerKpp ? 'error' : ''}
+                                    />
+                                    {errors.buyerKpp && <span className="error-message">{errors.buyerKpp}</span>}
+                                </div>
+                            </div>
 
-                    <div className="input-row">
-                        <div className="input-group half">
-                            <label htmlFor="buyerInn" className="required">
-                                ИНН
-                            </label>
-                            <input
-                                id="buyerInn"
-                                type="number"
-                                value={formData.buyerInn}
-                                onChange={handleTextInputChange}
-                                placeholder="ИНН"
-                                required
-                                className={errors.buyerInn ? 'error' : ''}
-                            />
-                            {errors.buyerInn && <span className="error-message">{errors.buyerInn}</span>}
-                        </div>
-                        <div className="input-group half">
-                            <label htmlFor="buyerKpp" className="required">
-                                КПП
-                            </label>
-                            <input
-                                id="buyerKpp"
-                                type="number"
-                                value={formData.buyerKpp}
-                                onChange={handleTextInputChange}
-                                placeholder="КПП"
-                                required
-                                className={errors.buyerKpp ? 'error' : ''}
-                            />
-                            {errors.buyerKpp && <span className="error-message">{errors.buyerKpp}</span>}
-                        </div>
-                    </div>
-                    <div className="input-row">
-                        <div className="input-group half">
-                            <label htmlFor="buyerInd" className="required">
-                                Индекс
-                            </label>
-                            <input
-                                id="buyerInd"
-                                type="number"
-                                value={formData.buyerInd}
-                                onChange={handleTextInputChange}
-                                placeholder="Индекс"
-                                required
-                                className={errors.buyerInd ? 'error' : ''}
-                            />
-                            {errors.buyerInd && <span className="error-message">{errors.buyerInd}</span>}
-                        </div>
-                        <div className="input-group half">
-                            <label htmlFor="buyerPhone">
-                                Телефон
-                            </label>
-                            <input
-                                id="buyerPhone"
-                                type="text"
-                                value={formData.buyerPhone || ''}
-                                onChange={handleTextInputChange}
-                                placeholder="+7 (999) 999-99-99"
-                            />
-                        </div>
-                    </div>
-                    <div className="input-group">
-                        <label htmlFor="buyerAddress" className="required">
-                            Адрес
-                        </label>
-                        <input
-                            id="buyerAddress"
-                            type="text"
-                            value={formData.buyerAddress}
-                            onChange={handleTextInputChange}
-                            placeholder="Адрес"
-                            required
-                            className={errors.buyerAddress ? 'error' : ''}
-                        />
-                        {errors.buyerAddress && <span className="error-message">{errors.buyerAddress}</span>}
-                    </div>
+                            <div className="input-row">
+                                <div className="input-group half">
+                                    <label htmlFor="buyerInd" className="required">
+                                        Индекс
+                                    </label>
+                                    <input
+                                        id="buyerInd"
+                                        type="number"
+                                        value={formData.buyerInd}
+                                        onChange={handleTextInputChange}
+                                        placeholder="Индекс"
+                                        required
+                                        className={errors.buyerInd ? 'error' : ''}
+                                    />
+                                    {errors.buyerInd && <span className="error-message">{errors.buyerInd}</span>}
+                                </div>
+                                <div className="input-group half">
+                                    <label htmlFor="buyerPhone">
+                                        Телефон
+                                    </label>
+                                    <input
+                                        id="buyerPhone"
+                                        type="text"
+                                        value={formData.buyerPhone || ''}
+                                        onChange={handleTextInputChange}
+                                        placeholder="+7 (999) 999-99-99"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="input-group">
+                                <label htmlFor="buyerAddress" className="required">
+                                    Адрес
+                                </label>
+                                <input
+                                    id="buyerAddress"
+                                    type="text"
+                                    value={formData.buyerAddress}
+                                    onChange={handleTextInputChange}
+                                    placeholder="Адрес"
+                                    required
+                                    className={errors.buyerAddress ? 'error' : ''}
+                                />
+                                {errors.buyerAddress && <span className="error-message">{errors.buyerAddress}</span>}
+                            </div>
+                        </>
+                    }
                 </fieldset>
 
-                {/* Тип документа и категория */}
-                <fieldset className="form-section">
-                    <legend>📄 Список работ/услуг</legend>
-                    <div className="input-group">
-                        {formData?.items?.length
-                            ?
+                {!formData.fromFile &&
+                    <fieldset className="form-section">
+                        <legend>📄 Список работ/услуг</legend>
+                        <div className="input-group">
+                            {formData?.items?.length
+                                ?
                                 <div className="priority-buttons" style={{flexDirection: 'column'}}>
                                     {formData.items.map((item) => (
                                         <button
@@ -404,91 +446,109 @@ const InvoiceForPayment = () => {
                                     ))}
                                 </div>
 
-                            :
+                                :
                                 null
+                            }
+                            {errors.items && <span className="error-message">{errors.items}</span>}
+                        </div>
+                        {buyerItems?.length > 1 &&
+                            <div className="input-group">
+                                <label htmlFor="buyerItems" className="required">
+                                    Можете использовать существующие
+                                </label>
+                                <select
+                                    id="buyerItems"
+                                    value={buyerItemsSelected as number}
+                                    onChange={onChangeBuyerItems}
+                                    className={''}
+                                >
+                                    {buyerItems.map(i => (
+                                        <option key={i.id} value={i.id}>{i.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                         }
-                        {errors.items && <span className="error-message">{errors.items}</span>}
-                    </div>
 
-                    <div className="input-group">
-                        <input
-                            id="itemName"
-                            type="text"
-                            value={newItem.name}
-                            onChange={handleItemNameChange}
-                            placeholder="Наименование товара/услуги"
-                            className={''}
-                        />
-                    </div>
-
-                    <div className="input-row">
-                        <div className="input-group half">
-                            <label htmlFor="itemAmount" className="required">
-                                Количество
-                            </label>
+                        <div className="input-group">
                             <input
-                                id="itemAmount"
-                                type="number"
-                                value={newItem.amount}
-                                onChange={handleItemAmountChange}
-                                placeholder="Количество"
-                                min={1}
-                                step="0.01"
-                                required
+                                id="itemName"
+                                type="text"
+                                value={newItem.name}
+                                onChange={handleItemNameChange}
+                                placeholder="Наименование товара/услуги"
                                 className={''}
                             />
                         </div>
-                        <div className="input-group half">
-                            <label htmlFor="itemPrice" className="required">
-                                Цена
-                            </label>
-                            <input
-                                id="itemPrice"
-                                type="number"
-                                min={0.01}
-                                step="0.01"
-                                value={newItem.price}
-                                onChange={handleItemPriceChange}
-                                placeholder="Цена"
-                                required
-                                className={''}
-                            />
-                        </div>
-                    </div>
 
-                    <div className="input-group" style={{display: 'flex', justifyContent: 'center', gap: '5px'}}>
-                    {permittedOperations !== 'none' &&
-                            <button
-                                id="buttonAddItem"
-                                className="tg-button secondary"
-                                style={{fontSize: '14px'}}
-                                onClick={(e) => handleAddNewItem(e)}
-                            >
-                                Добавить
-                            </button>
-                        }
-                        {permittedOperations === 'edit' &&
-                            <>
+                        <div className="input-row">
+                            <div className="input-group half">
+                                <label htmlFor="itemAmount" className="required">
+                                    Количество
+                                </label>
+                                <input
+                                    id="itemAmount"
+                                    type="number"
+                                    value={newItem.amount}
+                                    onChange={handleItemAmountChange}
+                                    placeholder="Количество"
+                                    min={1}
+                                    step="0.01"
+                                    required
+                                    className={''}
+                                />
+                            </div>
+                            <div className="input-group half">
+                                <label htmlFor="itemPrice" className="required">
+                                    Цена
+                                </label>
+                                <input
+                                    id="itemPrice"
+                                    type="number"
+                                    min={0.01}
+                                    step="0.01"
+                                    value={newItem.price}
+                                    onChange={handleItemPriceChange}
+                                    placeholder="Цена"
+                                    required
+                                    className={''}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="input-group" style={{display: 'flex', justifyContent: 'center', gap: '5px'}}>
+                            {permittedOperations !== 'none' &&
                                 <button
-                                    id="buttonEditItem"
-                                    className="tg-button primary"
+                                    id="buttonAddItem"
+                                    className="tg-button secondary"
                                     style={{fontSize: '14px'}}
-                                    onClick={(e) => handleEditNewItem(e)}
+                                    onClick={(e) => handleAddNewItem(e)}
                                 >
-                                    Изменить
+                                    Добавить
                                 </button>
-                                <button
-                                    id="buttonRemoveItem"
-                                    className="tg-button danger"
-                                    style={{fontSize: '14px'}}
-                                    onClick={(e) => handleRemoveNewItem(e)}
-                                >
-                                    Удалить
-                                </button>
-                            </>
-                        }
-                    </div>
-                </fieldset>
+                            }
+                            {permittedOperations === 'edit' &&
+                                <>
+                                    <button
+                                        id="buttonEditItem"
+                                        className="tg-button primary"
+                                        style={{fontSize: '14px'}}
+                                        onClick={(e) => handleEditNewItem(e)}
+                                    >
+                                        Изменить
+                                    </button>
+                                    <button
+                                        id="buttonRemoveItem"
+                                        className="tg-button danger"
+                                        style={{fontSize: '14px'}}
+                                        onClick={(e) => handleRemoveNewItem(e)}
+                                    >
+                                        Удалить
+                                    </button>
+                                </>
+                            }
+                        </div>
+                    </fieldset>
+                }
 
                 {/* Кнопки действий */}
                 {/*<div className="form-actions">*/}
