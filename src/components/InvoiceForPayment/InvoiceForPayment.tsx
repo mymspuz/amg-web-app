@@ -310,7 +310,7 @@ const InvoiceForPayment = () => {
             <form className="adaptive-form">
                 {/* Основная информация */}
                 <fieldset className="form-section">
-                    <legend>👤 Покупатель</legend>
+                    <legend>👤 Покупатель {fromFile} - {`${formData.fromFile}`}</legend>
 
                     <div className="input-group">
                         <label htmlFor="buyer" className="required">
