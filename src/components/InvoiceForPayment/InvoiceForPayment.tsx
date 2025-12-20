@@ -5,7 +5,7 @@ import { useTelegram } from '../../hooks/useTelegram'
 
 import './InvoiceForPayment.css'
 
-import counterparties from '../../data/counterparty.json'
+import counterpartiesJson from '../../data/counterparty.json'
 
 interface IItem {
     id: number
@@ -61,8 +61,9 @@ const InvoiceForPayment = () => {
 
     const navigate = useNavigate()
     const [search, setSearch] = useSearchParams()
-    const counterpartyId = Number(search.get('counterparty'))
+    const counterpartyId = Number(search.get('counterpartyId'))
     const fromFile = search.get('fromFile')
+    const counterparties = [...counterpartiesJson]
     if (!counterparties.find(i => i.id === 0)) {
         counterparties.push({
             id: 0,
@@ -274,6 +275,7 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         if (formData?.items?.length) setErrors({ ...errors, items: '' })
+        console.log('formData - ', formData)
         validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
     }, [formData])
 
