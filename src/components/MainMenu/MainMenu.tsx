@@ -56,7 +56,7 @@ const MainMenu = () => {
                     <button
                         id="buttonTaskMenu"
                         className="tg-button primary"
-                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${(!!fromFile)}`)}
+                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${fromFile}`)}
                     >
                         📝 Создать счет
                     </button>
