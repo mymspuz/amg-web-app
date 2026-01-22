@@ -58,6 +58,13 @@ const MainMenu = () => {
                     >
                         📝 Создать счет
                     </button>
+                    <button
+                        id="buttonTaskMenu"
+                        className="tg-button primary"
+                        onClick={() => handleButtonClick(`PaymentOrder?counterpartyId=${counterparty}`)}
+                    >
+                        📝 Создать пп
+                    </button>
                 </div>
                 <button className="main-action-button" onClick={handleMainAction}>
                     Закрыть
