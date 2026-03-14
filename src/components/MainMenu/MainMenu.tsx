@@ -10,8 +10,9 @@ const MainMenu = () => {
 
     const navigate = useNavigate()
     const [search, setSearch] = useSearchParams()
-    const fromFile = Number(search.get('fromFile'))
-
+    const incomingFile = Number(search.get('incomingFile'))
+    const invoiceFile = Number(search.get('invoiceFile'))
+    console.log('invoiceFile - ', invoiceFile)
     function onChangeCounterparty(e: { target: { value: any } }) {
         setCounterparty(Number(e.target.value))
     }
@@ -54,17 +55,22 @@ const MainMenu = () => {
                     <button
                         id="buttonTaskMenu"
                         className="tg-button primary"
-                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${fromFile}`)}
+                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${incomingFile}`)}
                     >
                         📝 Создать счет
                     </button>
-                    <button
-                        id="buttonTaskMenu"
-                        className="tg-button primary"
-                        onClick={() => handleButtonClick(`PaymentOrder?counterpartyId=${counterparty}`)}
-                    >
-                        📝 Создать пп
-                    </button>
+                    {invoiceFile
+                        ?
+                        <button
+                            id="buttonTaskMenu"
+                            className="tg-button primary"
+                            onClick={() => handleButtonClick(`PaymentOrder?counterpartyId=${counterparty}`)}
+                        >
+                            📝 Создать пп
+                        </button>
+                        :
+                        null
+                    }
                 </div>
                 <button className="main-action-button" onClick={handleMainAction}>
                     Закрыть
