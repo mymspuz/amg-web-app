@@ -14,6 +14,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-router-dom": "^5.3.3",
     "@types/telegram-web-app": "^7.10.1",
+    "axios": "^1.14.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^6.26.2",

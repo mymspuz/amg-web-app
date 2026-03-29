@@ -1,11 +1,12 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { useTelegram } from '../../hooks/useTelegram'
+// import { useTelegram } from '../../hooks/useTelegram'
 
 import './InvoiceForPayment.css'
 
 import counterpartiesJson from '../../data/counterparty.json'
+import axios from "axios";
 
 interface IItem {
     id: number
@@ -55,7 +56,7 @@ interface ICounterparty {
 type TPermittedOperations = 'none' | 'add' | 'edit'
 
 const InvoiceForPayment = () => {
-    const { tg, queryId, user, chat} = useTelegram()
+    // const { tg, queryId, user, chat} = useTelegram()
 
     const [errors, setErrors] = useState<IFormErrors>({} as IFormErrors);
 
@@ -87,6 +88,8 @@ const InvoiceForPayment = () => {
     const [buyer, setBuyer] = useState<number>(counterparties[0].id)
     const [buyerItems, setBuyerItems] = useState<{ id: number, label: string }[]>([])
     const [buyerItemsSelected, setBuyerItemsSelected] = useState<number>(-1)
+    const [readyFile, setReadyFile] = useState<string>('')
+
     const [formData, setFormData] = useState<IFormData>({
         buyerName: '',
         buyerInn: 0,
@@ -101,6 +104,32 @@ const InvoiceForPayment = () => {
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1})
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
+
+    function axiosDownloadFile() {
+        return axios({
+            url: 'http://195.68.140.114:7801/tasks/download', // 'http://localhost:3001/tasks/download'
+            data: { filePath: readyFile },
+            method: 'POST',
+            responseType: 'blob',
+        })
+            .then(response => {
+                const href = window.URL.createObjectURL(response.data);
+
+                const anchorElement = document.createElement('a');
+
+                anchorElement.href = href;
+                anchorElement.download = 'c7a3d780d80682c18d3027c4e072df07';
+
+                document.body.appendChild(anchorElement);
+                anchorElement.click();
+
+                document.body.removeChild(anchorElement);
+                window.URL.revokeObjectURL(href);
+            })
+            .catch(error => {
+                console.log('error: ', error);
+            });
+    }
 
     function onChangeBuyer(e: { target: { value: any } }) {
         setBuyer(Number(e.target.value))
@@ -223,12 +252,31 @@ const InvoiceForPayment = () => {
     }
 
     const onSendData = useCallback(async () => {
-        tg.sendData(JSON.stringify({
-            type: 'invent',
-            data: formData,
-            counterpartyId
-        }));
+        // tg.sendData(JSON.stringify({
+        //     type: 'invent',
+        //     data: formData,
+        //     counterpartyId
+        // }));
     }, [formData, counterpartyId])
+
+    async function sendData() {
+        try {
+            if (readyFile) {
+                return axiosDownloadFile()
+            }
+            const response = await axios.post(`http://195.68.140.114:7801/tasks/incomingFile`,
+                formData,
+                {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            setReadyFile(response.data.fileName)
+            console.log('Success:', response.data);
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
 
     useEffect(() => {
         const selectedBuyer = counterparties.filter(b => b.id === buyer)[0]
@@ -275,20 +323,20 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         if (formData?.items?.length) setErrors({ ...errors, items: '' })
-        validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
+        // validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
     }, [formData])
 
     useEffect(() => {
-        tg.onEvent('mainButtonClicked', onSendData)
-        return () => {
-            tg.offEvent('mainButtonClicked', onSendData)
-        }
+        // tg.onEvent('mainButtonClicked', onSendData)
+        // return () => {
+        //     tg.offEvent('mainButtonClicked', onSendData)
+        // }
     }, [onSendData])
 
     useEffect(() => {
-        tg.MainButton.setParams({
-            text: 'Отправить данные'
-        })
+        // tg.MainButton.setParams({
+        //     text: 'Отправить данные'
+        // })
     }, [])
 
     return (
@@ -550,6 +598,9 @@ const InvoiceForPayment = () => {
                         </div>
                     </fieldset>
                 }
+                <button onClick={sendData}>
+                    { readyFile ? 'Скачать файл' : 'Отправить данные' }
+                </button>
             </form>
         </div>
     )

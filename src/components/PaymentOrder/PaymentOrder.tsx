@@ -1,7 +1,8 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import axios, {AxiosProgressEvent} from 'axios'
 
-import { useTelegram } from '../../hooks/useTelegram'
+// import { useTelegram } from '../../hooks/useTelegram'
 
 import './PaymentOrder.css'
 
@@ -30,7 +31,7 @@ interface IFormData {
 // }
 
 const PaymentOrder = () => {
-    const { tg, queryId, user, chat} = useTelegram()
+    // const { tg, queryId, user, chat} = useTelegram()
 
     const navigate = useNavigate()
     const [search, setSearch] = useSearchParams()
@@ -47,6 +48,80 @@ const PaymentOrder = () => {
         comment: '',
     })
 
+    function axiosDownloadFile() {
+        return axios({
+            url: 'http://localhost:3001/tasks/download',
+            method: 'GET',
+            responseType: 'blob',
+        })
+            .then(response => {
+                const href = window.URL.createObjectURL(response.data);
+
+                const anchorElement = document.createElement('a');
+
+                anchorElement.href = href;
+                anchorElement.download = 'c7a3d780d80682c18d3027c4e072df07';
+
+                document.body.appendChild(anchorElement);
+                anchorElement.click();
+
+                document.body.removeChild(anchorElement);
+                window.URL.revokeObjectURL(href);
+            })
+            .catch(error => {
+                console.log('error: ', error);
+            });
+    }
+
+    const [file, setFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handleFileChange = (e: any) => {
+        setFile(e.target.files[0]);
+    };
+
+    const handleUpload = async () => {
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await axios.post('http://localhost:3001/tasks/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+                    const percentCompleted = Math.round(
+                        (progressEvent.loaded * 100) / (progressEvent.total ? progressEvent.total : 0)
+                    );
+                    console.log(`Upload progress: ${percentCompleted}%`);
+                },
+            });
+
+            console.log('Success:', response.data);
+        } catch (error) {
+            console.error('Error:', error);
+        } finally {
+            setUploading(false);
+        }
+        // try {
+        //     const response = await fetch('http://localhost:3001/tasks/upload', {
+        //         method: 'POST',
+        //         body: formData,
+        //         // Не устанавливайте Content-Type вручную - браузер сам добавит boundary
+        //     });
+        //     console.log('Success:', response);
+        //
+        //     const data = await response.json();
+        //     console.log('Success:', data);
+        // } catch (error) {
+        //     console.error('Error:', error);
+        // } finally {
+        //     setUploading(false);
+        // }
+    };
     const handleBack = (): void => {
         navigate(-1)
     }
@@ -64,27 +139,27 @@ const PaymentOrder = () => {
     }
 
     const onSendData = useCallback(async () => {
-        tg.sendData(JSON.stringify({
-            type: 'paymentOrder',
-            data: formData,
-        }));
+        // tg.sendData(JSON.stringify({
+        //     type: 'paymentOrder',
+        //     data: formData,
+        // }));
     }, [formData])
 
     useEffect(() => {
-        tg.MainButton.show()
+        // tg.MainButton.show()
     }, [formData])
 
     useEffect(() => {
-        tg.onEvent('mainButtonClicked', onSendData)
-        return () => {
-            tg.offEvent('mainButtonClicked', onSendData)
-        }
+        // tg.onEvent('mainButtonClicked', onSendData)
+        // return () => {
+        //     tg.offEvent('mainButtonClicked', onSendData)
+        // }
     }, [onSendData])
 
     useEffect(() => {
-        tg.MainButton.setParams({
-            text: 'Отправить данные'
-        })
+        // tg.MainButton.setParams({
+        //     text: 'Отправить данные'
+        // })
     }, [])
 
     return (
@@ -137,7 +212,17 @@ const PaymentOrder = () => {
                             <option key={i.id} value={i.id}>{i.name}</option>
                         ))}
                     </select>
-
+                    <div>
+                        <input type="file" onChange={handleFileChange} />
+                        <button onClick={handleUpload} disabled={!file || uploading}>
+                            {uploading ? 'Uploading...' : 'Upload'}
+                        </button>
+                    </div>
+                    <div>
+                        <button onClick={axiosDownloadFile}>
+                            Скачать
+                        </button>
+                    </div>
                     {/*<div className="input-row">*/}
                     {/*    <div className="input-group half">*/}
                     {/*        <label htmlFor="itemAmount" className="required">*/}
