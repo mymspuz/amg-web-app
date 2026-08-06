@@ -1,21 +1,31 @@
-const tg = {} //window.Telegram.WebApp
+const tg = window.Telegram?.WebApp
 
 export function useTelegram() {
+    const onClose = () => tg?.close()
 
-    const onClose = () => {
-        //tg.close()
+    // Показывает главную кнопку Telegram с нужным текстом и обработчиком
+    const showMainButton = (text: string, onClick: () => void) => {
+        if (!tg?.MainButton) return () => {}
+
+        tg.MainButton.setParams({ text })
+        tg.MainButton.show()
+        tg.MainButton.onClick(onClick)
+
+        return () => {
+            tg.MainButton.offClick(onClick)
+            tg.MainButton.hide()
+        }
     }
 
-    const onToggleButton = () => {
-        //tg.MainButton.isVisible ? tg.MainButton.hide() : tg.MainButton.show()
-    }
+    const hideMainButton = () => tg?.MainButton?.hide()
 
     return {
-        onClose,
-        onToggleButton,
         tg,
-        user: {} //tg.initDataUnsafe?.user, // {"id":319925498,"first_name":"Smirnov","last_name":"Ruslan","username":"mspuz","language_code":"ru","allows_write_to_pm":true,"photo_url":"https://t.me/i/userpic/320/fjsE1BHxePMsPeHkgTZXBzcWNuvwPw7SN3c0nvnTwrM.svg"}
-        // chat: tg.initDataUnsafe?.chat,
-        // queryId: tg.initDataUnsafe?.query_id,
+        onClose,
+        showMainButton,
+        hideMainButton,
+        user: tg?.initDataUnsafe?.user,
+        // Приложение открыто внутри Telegram - только тогда есть подписанные данные
+        isTelegram: Boolean(tg?.initData),
     }
 }

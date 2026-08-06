@@ -1,18 +1,42 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import './MainMenu.css'
 
 import counterparties from '../../data/counterparty.json'
+import { fetchState, IChatState } from '../../api/client'
+import { useTelegram } from '../../hooks/useTelegram'
 
 const MainMenu = () => {
     const [counterparty, setCounterparty] = useState<number>(counterparties[0].id)
+    const [state, setState] = useState<IChatState | null>(null)
+    const [error, setError] = useState<string>('')
 
     const navigate = useNavigate()
-    const [search, setSearch] = useSearchParams()
-    const incomingFile = Number(search.get('incomingFile'))
-    const invoiceFile = Number(search.get('invoiceFile'))
-    console.log('invoiceFile - ', invoiceFile)
+    const [search] = useSearchParams()
+    const { onClose, hideMainButton } = useTelegram()
+
+    // Раздел, с которого бот попросил начать - приходит из inline-кнопки
+    const section = search.get('section')
+
+    useEffect(() => {
+        hideMainButton()
+
+        // Состояние приходит от бота, а не из ссылки: оно всегда актуальное
+        fetchState()
+            .then(setState)
+            .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить данные от бота'))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Бот прислал кнопку сразу на нужный экран
+    useEffect(() => {
+        if (!state) return
+        if (section === 'payment' && state.hasInvoice) navigate('/PaymentOrder')
+        if (section === 'invoice') navigate(`/InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state.hasItems ? 1 : 0}`)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state, section])
+
     function onChangeCounterparty(e: { target: { value: any } }) {
         setCounterparty(Number(e.target.value))
     }
@@ -20,21 +44,16 @@ const MainMenu = () => {
     const handleButtonClick = (path: string) => {
         navigate(`/${path}`)
     }
-    const handleMainAction = () => {
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.close();
-        } else {
-            alert('Основное действие выполнено!');
-        }
-    }
 
     return (
         <>
             <div className="telegram-container">
                 <div className="header">
                     <h1>AMG</h1>
-                    <h3>Пользователь</h3>
+                    <h3>{state ? state.fullName : 'Загрузка...'}</h3>
                 </div>
+
+                {error && <div className="error-message">{error}</div>}
 
                 <div className="buttons-container">
                     <div className="input-row">
@@ -55,24 +74,23 @@ const MainMenu = () => {
                     <button
                         id="buttonTaskMenu"
                         className="tg-button primary"
-                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${incomingFile}`)}
+                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state?.hasItems ? 1 : 0}`)}
                     >
-                        📝 Создать счет
+                        📝 Создать счет{state?.hasItems ? ` (строк из файла: ${state.itemsCount})` : ''}
                     </button>
-                    {invoiceFile
-                        ?
-                        <button
+
+                    {state?.hasInvoice
+                        ? <button
                             id="buttonTaskMenu"
                             className="tg-button primary"
-                            onClick={() => handleButtonClick(`PaymentOrder?counterpartyId=${counterparty}`)}
+                            onClick={() => handleButtonClick('PaymentOrder')}
                         >
-                            📝 Создать пп
+                            📝 Создать пп на {state.invoice.sum} руб.
                         </button>
-                        :
-                        null
+                        : null
                     }
                 </div>
-                <button className="main-action-button" onClick={handleMainAction}>
+                <button className="main-action-button" onClick={onClose}>
                     Закрыть
                 </button>
             </div>
