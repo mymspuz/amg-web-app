@@ -1,12 +1,12 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-// import { useTelegram } from '../../hooks/useTelegram'
+import { useTelegram } from '../../hooks/useTelegram'
 
 import './InvoiceForPayment.css'
 
 import counterpartiesJson from '../../data/counterparty.json'
-import axios from "axios";
+import { sendInvoice } from '../../api/client'
 
 interface IItem {
     id: number
@@ -56,7 +56,7 @@ interface ICounterparty {
 type TPermittedOperations = 'none' | 'add' | 'edit'
 
 const InvoiceForPayment = () => {
-    // const { tg, queryId, user, chat} = useTelegram()
+    const { onClose, showMainButton } = useTelegram()
 
     const [errors, setErrors] = useState<IFormErrors>({} as IFormErrors);
 
@@ -88,7 +88,7 @@ const InvoiceForPayment = () => {
     const [buyer, setBuyer] = useState<number>(counterparties[0].id)
     const [buyerItems, setBuyerItems] = useState<{ id: number, label: string }[]>([])
     const [buyerItemsSelected, setBuyerItemsSelected] = useState<number>(-1)
-    const [readyFile, setReadyFile] = useState<string>('')
+    const [sendError, setSendError] = useState<string>('')
 
     const [formData, setFormData] = useState<IFormData>({
         buyerName: '',
@@ -104,32 +104,6 @@ const InvoiceForPayment = () => {
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1})
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
-
-    function axiosDownloadFile() {
-        return axios({
-            url: 'http://195.68.140.114:7801/tasks/download', // 'http://localhost:3001/tasks/download'
-            data: { filePath: readyFile },
-            method: 'POST',
-            responseType: 'blob',
-        })
-            .then(response => {
-                const href = window.URL.createObjectURL(response.data);
-
-                const anchorElement = document.createElement('a');
-
-                anchorElement.href = href;
-                anchorElement.download = 'c7a3d780d80682c18d3027c4e072df07';
-
-                document.body.appendChild(anchorElement);
-                anchorElement.click();
-
-                document.body.removeChild(anchorElement);
-                window.URL.revokeObjectURL(href);
-            })
-            .catch(error => {
-                console.log('error: ', error);
-            });
-    }
 
     function onChangeBuyer(e: { target: { value: any } }) {
         setBuyer(Number(e.target.value))
@@ -252,31 +226,28 @@ const InvoiceForPayment = () => {
     }
 
     const onSendData = useCallback(async () => {
-        // tg.sendData(JSON.stringify({
-        //     type: 'invent',
-        //     data: formData,
-        //     counterpartyId
-        // }));
-    }, [formData, counterpartyId])
+        if (!validateForm()) return
 
-    async function sendData() {
+        setSendError('')
         try {
-            if (readyFile) {
-                return axiosDownloadFile()
-            }
-            const response = await axios.post(`http://195.68.140.114:7801/tasks/incomingFile`,
-                formData,
-                {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            setReadyFile(response.data.fileName)
-            console.log('Success:', response.data);
-        } catch (error) {
-            console.error('Error:', error);
+            // Счет формирует бот и присылает печатную форму в чат
+            await sendInvoice({
+                counterpartyId: formData.counterpartyId,
+                fromFile: formData.fromFile,
+                items: formData.items.map(i => ({ name: i.name, amount: i.amount, price: i.price })),
+                buyerName: formData.buyerName,
+                buyerInn: formData.buyerInn,
+                buyerKpp: formData.buyerKpp,
+                buyerInd: formData.buyerInd,
+                buyerAddress: formData.buyerAddress,
+                buyerPhone: formData.buyerPhone,
+            })
+            onClose()
+        } catch (e) {
+            setSendError(e instanceof Error ? e.message : String(e))
         }
-    }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData])
 
     useEffect(() => {
         const selectedBuyer = counterparties.filter(b => b.id === buyer)[0]
@@ -323,21 +294,14 @@ const InvoiceForPayment = () => {
 
     useEffect(() => {
         if (formData?.items?.length) setErrors({ ...errors, items: '' })
-        // validateForm() ? tg.MainButton.show() : tg.MainButton.hide()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData])
 
+    // Отправка по главной кнопке Telegram
     useEffect(() => {
-        // tg.onEvent('mainButtonClicked', onSendData)
-        // return () => {
-        //     tg.offEvent('mainButtonClicked', onSendData)
-        // }
+        return showMainButton('Выставить счет', onSendData)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onSendData])
-
-    useEffect(() => {
-        // tg.MainButton.setParams({
-        //     text: 'Отправить данные'
-        // })
-    }, [])
 
     return (
         <div className="form-container">
@@ -598,8 +562,9 @@ const InvoiceForPayment = () => {
                         </div>
                     </fieldset>
                 }
-                <button onClick={sendData}>
-                    { readyFile ? 'Скачать файл' : 'Отправить данные' }
+                {sendError && <span className="error-message">{sendError}</span>}
+                <button type="button" className="tg-button primary" onClick={onSendData}>
+                    Выставить счет
                 </button>
             </form>
         </div>
