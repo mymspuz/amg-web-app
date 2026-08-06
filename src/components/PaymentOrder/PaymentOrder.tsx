@@ -56,8 +56,10 @@ const PaymentOrder = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onSendData])
 
+    // Экран открывается и напрямую из кнопки бота, поэтому идем на главную,
+    // а не назад по истории - назад там пусто
     const handleBack = (): void => {
-        navigate(-1)
+        navigate('/')
     }
 
     function onChangeClient(e: { target: { value: any } }) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import './MainMenu.css'
 
@@ -13,11 +13,7 @@ const MainMenu = () => {
     const [error, setError] = useState<string>('')
 
     const navigate = useNavigate()
-    const [search] = useSearchParams()
     const { onClose, hideMainButton } = useTelegram()
-
-    // Раздел, с которого бот попросил начать - приходит из inline-кнопки
-    const section = search.get('section')
 
     useEffect(() => {
         hideMainButton()
@@ -28,14 +24,6 @@ const MainMenu = () => {
             .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить данные от бота'))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-
-    // Бот прислал кнопку сразу на нужный экран
-    useEffect(() => {
-        if (!state) return
-        if (section === 'payment' && state.hasInvoice) navigate('/PaymentOrder')
-        if (section === 'invoice') navigate(`/InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state.hasItems ? 1 : 0}`)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [state, section])
 
     function onChangeCounterparty(e: { target: { value: any } }) {
         setCounterparty(Number(e.target.value))
