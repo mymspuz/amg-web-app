@@ -102,3 +102,42 @@ export const resetData = async (): Promise<void> => {
         throw new Error(errorText(error))
     }
 }
+
+export interface IRequestCard {
+    uuid: string
+    type: string
+    status: string
+    statusTitle: string
+    // После отправки в 1С править поздно
+    editable: boolean
+    payload: { supplierINN?: string, buyerINN?: string, sum?: number, [key: string]: any }
+    recognized: { supplierINN?: string, buyerINN?: string, sum?: number } | null
+    organizationId: number | null
+    createdAt: string
+}
+
+export const fetchRequest = async (uuid: string): Promise<IRequestCard> => {
+    const { data } = await api.get<{ status: boolean, request: IRequestCard }>(`/requests/${uuid}`)
+    return data.request
+}
+
+// Подтверждение карточки: сюда же уходят правки пользователя
+export const confirmRequest = async (
+    uuid: string,
+    values: { supplierINN: string, buyerINN: string, sum: number }
+): Promise<string[]> => {
+    try {
+        const { data } = await api.post<{ status: boolean, corrected: string[] }>(`/requests/${uuid}/confirm`, values)
+        return data.corrected
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const cancelRequest = async (uuid: string): Promise<void> => {
+    try {
+        await api.post(`/requests/${uuid}/cancel`)
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
