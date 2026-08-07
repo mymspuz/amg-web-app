@@ -162,7 +162,39 @@ export interface IRequestListItem {
     createdAt: string
 }
 
-export const fetchRequests = async (): Promise<IRequestListItem[]> => {
-    const { data } = await api.get<{ status: boolean, requests: IRequestListItem[] }>('/requests')
+export type TRequestScope = 'active' | 'completed' | 'all'
+
+export const fetchRequests = async (scope: TRequestScope = 'all', type?: string): Promise<IRequestListItem[]> => {
+    const { data } = await api.get<{ status: boolean, requests: IRequestListItem[] }>('/requests', {
+        params: { scope, type },
+    })
     return data.requests
+}
+
+export interface IRequestEvent {
+    status: string
+    statusTitle: string
+    comment: string | null
+    // user, 1c, accountant или system
+    actor: string
+    createdAt: string
+}
+
+export const fetchRequestEvents = async (uuid: string): Promise<IRequestEvent[]> => {
+    const { data } = await api.get<{ status: boolean, events: IRequestEvent[] }>(`/requests/${uuid}/events`)
+    return data.events
+}
+
+// Загрузка счета из приложения: файл уходит на разбор, дальше - карточка
+export const uploadInvoice = async (file: File, organizationId: number): Promise<string> => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('organizationId', String(organizationId))
+
+    try {
+        const { data } = await api.post<{ status: boolean, uuid: string }>('/payments/upload', form)
+        return data.uuid
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
 }

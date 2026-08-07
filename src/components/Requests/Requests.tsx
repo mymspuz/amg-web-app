@@ -3,21 +3,28 @@ import { useNavigate } from 'react-router-dom'
 
 import '../../theme/theme1c.css'
 
-import { fetchRequests, IRequestListItem } from '../../api/client'
+import { useSearchParams } from 'react-router-dom'
 
-// Раздел «Мои заявки» из MVP: статусы и результат обработки
+import { fetchRequests, IRequestListItem, TRequestScope } from '../../api/client'
+
+// Список заявок. scope в адресе разделяет «на проверке» и историю -
+// экран один, а пункты меню ведут в разные его состояния
 const Requests = () => {
     const navigate = useNavigate()
+    const [search] = useSearchParams()
+    const scope = (search.get('scope') || 'all') as TRequestScope
+
     const [items, setItems] = useState<IRequestListItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
     useEffect(() => {
-        fetchRequests()
+        setLoading(true)
+        fetchRequests(scope)
             .then(setItems)
             .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить заявки'))
             .finally(() => setLoading(false))
-    }, [])
+    }, [scope])
 
     const typeTitle = (type: string): string => {
         if (type === 'check') return 'Проверка счёта'
@@ -39,15 +46,25 @@ const Requests = () => {
             <button className="back-link" onClick={() => navigate('/')}>‹ Меню</button>
 
             <div className="app-header">
-                <h2 style={{ margin: 0 }}>📋 Мои заявки</h2>
-                <span className="muted">Статусы обработки в 1С</span>
+                <h2 style={{ margin: 0 }}>
+                    {scope === 'active' ? '⏳ Платежи на проверке' : scope === 'completed' ? '🗂 История' : '📋 Мои заявки'}
+                </h2>
+                <span className="muted">
+                    {scope === 'active' ? 'Заявки в работе' : scope === 'completed' ? 'Завершённые заявки' : 'Статусы обработки в 1С'}
+                </span>
             </div>
 
             {loading && <p className="muted">Загрузка...</p>}
             {error && <div className="notice error">{error}</div>}
 
             {!loading && !items.length && !error && (
-                <div className="notice">Заявок пока нет. Пришлите счёт боту, чтобы создать первую.</div>
+                <div className="notice">
+                    {scope === 'active'
+                        ? 'Активных заявок нет.'
+                        : scope === 'completed'
+                            ? 'Завершённых заявок пока нет.'
+                            : 'Заявок пока нет. Загрузите счёт, чтобы создать первую.'}
+                </div>
             )}
 
             <div className="list-card">

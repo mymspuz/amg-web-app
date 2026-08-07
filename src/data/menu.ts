@@ -31,9 +31,9 @@ export const MENU: IMenuSection[] = [
         color: '#1c67d9',
         hint: 'Оплата счетов и статусы',
         items: [
-            { key: 'pay', title: 'Оплатить счёт', route: '/PaymentOrder', permission: 'confirm', requiresInvoice: true, hint: 'Пришлите счёт боту, затем подтвердите реквизиты' },
-            { key: 'pending', title: 'Платежи на проверке', route: '/Requests' },
-            { key: 'history', title: 'История', route: '/Requests' },
+            { key: 'pay', title: 'Оплатить счёт', route: '/PayInvoice', permission: 'create', hint: 'Загрузите счёт или пришлите его боту' },
+            { key: 'pending', title: 'Платежи на проверке', route: '/Requests?scope=active' },
+            { key: 'history', title: 'История', route: '/Requests?scope=completed' },
         ],
     },
     {
@@ -109,7 +109,7 @@ export const MENU: IMenuSection[] = [
         color: '#607d8b',
         hint: 'Реквизиты и доступы',
         items: [
-            { key: 'requisites', title: 'Реквизиты', route: '/Company' },
+            { key: 'requisites', title: 'Реквизиты' },
             { key: 'contract', title: 'Договор' },
             { key: 'tariff', title: 'Тариф' },
             { key: 'contacts', title: 'Контакты' },

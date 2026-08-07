@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import '../PaymentOrder/PaymentOrder.css'
 
-import { cancelRequest, confirmRequest, fetchRequest, IRequestCard } from '../../api/client'
+import { cancelRequest, confirmRequest, fetchRequest, fetchRequestEvents, IRequestCard, IRequestEvent } from '../../api/client'
 import { useTelegram } from '../../hooks/useTelegram'
 
 interface IForm {
@@ -20,6 +20,7 @@ const RequestCard = () => {
     const { onClose, showMainButton } = useTelegram()
 
     const [request, setRequest] = useState<IRequestCard | null>(null)
+    const [events, setEvents] = useState<IRequestEvent[]>([])
     const [form, setForm] = useState<IForm>({ supplierINN: '', buyerINN: '', sum: '' })
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
@@ -39,6 +40,9 @@ const RequestCard = () => {
             })
             .catch((e) => setError(e?.response?.data?.error || 'Заявка не найдена'))
             .finally(() => setLoading(false))
+
+        // История переходов: что с заявкой происходило
+        fetchRequestEvents(uuid).then(setEvents).catch(() => setEvents([]))
     }, [uuid])
 
     // ИНН бывает 10 знаков у организаций и 12 у предпринимателей
@@ -171,6 +175,19 @@ const RequestCard = () => {
                         {changed('sum') && <span className="hint">Распознано: {recognized?.sum}</span>}
                     </div>
                 </fieldset>
+
+                {events.length > 1 && (
+                    <fieldset className="form-section">
+                        <legend>Что происходило</legend>
+                        {events.map((e, i) => (
+                            <div key={i} className="hint">
+                                {new Date(e.createdAt).toLocaleString('ru-RU')} — {e.statusTitle}
+                                {e.actor !== 'system' ? ` (${e.actor === '1c' ? '1С' : e.actor === 'user' ? 'вы' : e.actor})` : ''}
+                                {e.comment ? `: ${e.comment}` : ''}
+                            </div>
+                        ))}
+                    </fieldset>
+                )}
 
                 {request?.editable && (
                     <fieldset className="form-section">
