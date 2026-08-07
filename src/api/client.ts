@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-// Адрес бота. Локально - http://localhost:3001, на проде должен быть https,
-// иначе браузер заблокирует запросы со страницы gh-pages как mixed content
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001'
+// Адрес бота. На проде приложение и api на одном домене, поэтому переменная
+// пустая и запросы идут относительно текущего адреса. Локально - отдельный порт.
+// Именно ?? , а не ||: пустая строка тут осмысленное значение
+const API_URL = process.env.REACT_APP_API_URL ?? 'http://localhost:3001'
 
 const api = axios.create({ baseURL: `${API_URL}/api` })
 
@@ -15,9 +16,26 @@ api.interceptors.request.use((config) => {
     return config
 })
 
+export type TAccessStatus = 'pending' | 'active' | 'blocked'
+export type TPermission = 'view' | 'create' | 'confirm' | 'approve'
+
+export interface IOrganization {
+    id: number
+    name: string
+    inn: string
+    permissions: TPermission[]
+    isDefault: boolean
+}
+
 export interface IChatState {
     status: boolean
     fullName: string
+    user: {
+        role: string
+        accessStatus: TAccessStatus
+        hasConsent: boolean
+    }
+    organizations: IOrganization[]
     // Загружены строки товаров из файла
     hasItems: boolean
     itemsCount: number
@@ -31,6 +49,7 @@ export interface IChatState {
 }
 
 export interface IInvoiceRequest {
+    organizationId: number
     counterpartyId: number
     fromFile: boolean
     items: { name: string, amount: number, price: number }[]
@@ -51,9 +70,17 @@ export const fetchState = async (): Promise<IChatState> => {
     return data
 }
 
-export const sendPaymentOrder = async (comment: string): Promise<void> => {
+export const acceptConsent = async (): Promise<void> => {
     try {
-        await api.post('/payment-order', { comment })
+        await api.post('/consent')
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const sendPaymentOrder = async (comment: string, organizationId: number): Promise<void> => {
+    try {
+        await api.post('/payment-order', { comment, organizationId })
     } catch (error) {
         throw new Error(errorText(error))
     }

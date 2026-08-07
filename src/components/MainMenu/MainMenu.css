@@ -569,3 +569,9 @@ input:checked + .slider:before {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.5);
 }
+/* Название организации, когда выбирать не из чего */
+.organization-name {
+    margin: 0 0 12px;
+    font-weight: 600;
+    opacity: 0.85;
+}
