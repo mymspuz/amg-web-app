@@ -2,6 +2,7 @@ import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useTelegram } from '../../hooks/useTelegram'
+import { useAppState } from '../../hooks/useAppState'
 
 import './InvoiceForPayment.css'
 
@@ -57,6 +58,7 @@ type TPermittedOperations = 'none' | 'add' | 'edit'
 
 const InvoiceForPayment = () => {
     const { onClose, showMainButton } = useTelegram()
+    const { organization } = useAppState()
 
     const [errors, setErrors] = useState<IFormErrors>({} as IFormErrors);
 
@@ -231,7 +233,13 @@ const InvoiceForPayment = () => {
         setSendError('')
         try {
             // Счет формирует бот и присылает печатную форму в чат
+            if (!organization) {
+                setSendError('Не выбрана организация')
+                return
+            }
+
             await sendInvoice({
+                organizationId: organization.id,
                 counterpartyId: formData.counterpartyId,
                 fromFile: formData.fromFile,
                 items: formData.items.map(i => ({ name: i.name, amount: i.amount, price: i.price })),
@@ -247,7 +255,7 @@ const InvoiceForPayment = () => {
             setSendError(e instanceof Error ? e.message : String(e))
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData])
+    }, [formData, organization])
 
     useEffect(() => {
         const selectedBuyer = counterparties.filter(b => b.id === buyer)[0]

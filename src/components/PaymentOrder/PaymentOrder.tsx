@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import './PaymentOrder.css'
 
-import { fetchState, IChatState, sendPaymentOrder } from '../../api/client'
+import { sendPaymentOrder } from '../../api/client'
+import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
 interface IFormData {
@@ -14,13 +15,13 @@ interface IFormData {
 const PaymentOrder = () => {
     const navigate = useNavigate()
     const { onClose, showMainButton } = useTelegram()
+    const { state, loading, organization, can } = useAppState()
 
     const clients = [
         { id: '1', name: 'Себе на карту' },
         { id: '2', name: 'Перевести на счет' },
     ]
 
-    const [state, setState] = useState<IChatState | null>(null)
     const [error, setError] = useState<string>('')
     const [sending, setSending] = useState<boolean>(false)
     const [formData, setFormData] = useState<IFormData>({
@@ -28,18 +29,16 @@ const PaymentOrder = () => {
         comment: '',
     })
 
-    // Реквизиты берем у бота: он хранит то, что подтвердила 1С
-    useEffect(() => {
-        fetchState()
-            .then(setState)
-            .catch(() => setError('Не удалось получить данные счета'))
-    }, [])
-
     const onSendData = useCallback(async () => {
+        if (!organization) return setError('Не выбрана организация')
+
         setSending(true)
         setError('')
         try {
-            await sendPaymentOrder(formData.comment || clients.find(c => c.id === formData.clientId)?.name || '')
+            await sendPaymentOrder(
+                formData.comment || clients.find(c => c.id === formData.clientId)?.name || '',
+                organization.id
+            )
             // Документ придет в чат отдельным сообщением
             onClose()
         } catch (e) {
@@ -48,7 +47,7 @@ const PaymentOrder = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData])
+    }, [formData, organization])
 
     // Отправляем по главной кнопке Telegram, если она доступна
     useEffect(() => {
@@ -56,8 +55,10 @@ const PaymentOrder = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onSendData])
 
+    // Экран открывается и напрямую из кнопки бота, поэтому идем на главную,
+    // а не назад по истории - назад там пусто
     const handleBack = (): void => {
-        navigate(-1)
+        navigate('/')
     }
 
     function onChangeClient(e: { target: { value: any } }) {
@@ -67,6 +68,8 @@ const PaymentOrder = () => {
     function handleCommentChange(e: ChangeEvent<HTMLInputElement>) {
         setFormData({ ...formData, comment: e.target.value })
     }
+
+    const canConfirm = can('confirm')
 
     return (
         <div className="form-container">
@@ -84,6 +87,18 @@ const PaymentOrder = () => {
             </div>
 
             <form className="adaptive-form">
+                {loading && <p>Загрузка...</p>}
+
+                {organization && (
+                    <fieldset className="form-section">
+                        <legend>🏢 Плательщик</legend>
+                        <div className="input-group">
+                            <h3>{organization.name}</h3>
+                            <h4>ИНН {organization.inn}</h4>
+                        </div>
+                    </fieldset>
+                )}
+
                 {state?.hasInvoice && (
                     <fieldset className="form-section">
                         <legend>👤 Получатель</legend>
@@ -97,6 +112,12 @@ const PaymentOrder = () => {
                 {state && !state.hasInvoice && (
                     <div className="error-message">
                         Нет данных счета. Пришлите счет боту и дождитесь проверки реквизитов.
+                    </div>
+                )}
+
+                {state && !canConfirm && (
+                    <div className="error-message">
+                        Нет права подтверждать платежи по этой организации.
                     </div>
                 )}
 
@@ -131,7 +152,7 @@ const PaymentOrder = () => {
                         type="button"
                         className="tg-button primary"
                         onClick={onSendData}
-                        disabled={sending || !state?.hasInvoice}
+                        disabled={sending || !state?.hasInvoice || !canConfirm}
                     >
                         {sending ? 'Отправляем...' : 'Создать платежное поручение'}
                     </button>

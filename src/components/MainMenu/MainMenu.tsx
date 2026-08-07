@@ -1,100 +1,134 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import React from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import './MainMenu.css'
+import '../../theme/theme1c.css'
 
-import counterparties from '../../data/counterparty.json'
-import { fetchState, IChatState } from '../../api/client'
+import { acceptConsent } from '../../api/client'
+import { MENU } from '../../data/menu'
+import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
+// Главное меню по разделу 5 ТЗ: разделы плитками, внутри - пункты.
+// Нереализованные пункты видны, но неактивны - так понятен объем сервиса
 const MainMenu = () => {
-    const [counterparty, setCounterparty] = useState<number>(counterparties[0].id)
-    const [state, setState] = useState<IChatState | null>(null)
-    const [error, setError] = useState<string>('')
-
     const navigate = useNavigate()
-    const [search] = useSearchParams()
     const { onClose, hideMainButton } = useTelegram()
+    const { state, loading, error, organization, selectOrganization, reload } = useAppState()
+    const [consentError, setConsentError] = React.useState('')
 
-    // Раздел, с которого бот попросил начать - приходит из inline-кнопки
-    const section = search.get('section')
+    hideMainButton()
 
-    useEffect(() => {
-        hideMainButton()
-
-        // Состояние приходит от бота, а не из ссылки: оно всегда актуальное
-        fetchState()
-            .then(setState)
-            .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить данные от бота'))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    // Бот прислал кнопку сразу на нужный экран
-    useEffect(() => {
-        if (!state) return
-        if (section === 'payment' && state.hasInvoice) navigate('/PaymentOrder')
-        if (section === 'invoice') navigate(`/InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state.hasItems ? 1 : 0}`)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [state, section])
-
-    function onChangeCounterparty(e: { target: { value: any } }) {
-        setCounterparty(Number(e.target.value))
+    const onAcceptConsent = async () => {
+        try {
+            await acceptConsent()
+            reload()
+        } catch (e) {
+            setConsentError(e instanceof Error ? e.message : String(e))
+        }
     }
 
-    const handleButtonClick = (path: string) => {
-        navigate(`/${path}`)
+    if (loading) {
+        return <div className="app"><p className="muted">Загрузка...</p></div>
+    }
+
+    if (error) {
+        return (
+            <div className="app">
+                <div className="notice error">{error}</div>
+                <button className="btn primary" onClick={reload}>Повторить</button>
+            </div>
+        )
+    }
+
+    const access = state?.user.accessStatus
+
+    if (access !== 'active') {
+        return (
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">
+                    {access === 'blocked'
+                        ? 'Доступ заблокирован. Обратитесь в АМГ.'
+                        : 'Доступ ещё не выдан. Обратитесь в АМГ за ссылкой-приглашением или отправьте боту свой номер телефона.'}
+                </div>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
+            </div>
+        )
+    }
+
+    if (!state?.user.hasConsent) {
+        return (
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">Для работы с сервисом требуется согласие на обработку персональных данных.</div>
+                {consentError && <div className="notice error">{consentError}</div>}
+                <button className="btn primary" onClick={onAcceptConsent}>Принимаю условия</button>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
+            </div>
+        )
+    }
+
+    if (!state.organizations.length) {
+        return (
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">Вам пока не назначена ни одна организация. Обратитесь в АМГ.</div>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
+            </div>
+        )
     }
 
     return (
-        <>
-            <div className="telegram-container">
-                <div className="header">
-                    <h1>AMG</h1>
-                    <h3>{state ? state.fullName : 'Загрузка...'}</h3>
-                </div>
+        <div className="app">
+            <div className="app-header">
+                <h1>АМГ</h1>
+                <span className="muted">{state.fullName}</span>
 
-                {error && <div className="error-message">{error}</div>}
-
-                <div className="buttons-container">
-                    <div className="input-row">
-                        <div className="input-group half">
+                <div className="org-row">
+                    {state.organizations.length > 1
+                        ? (
                             <select
-                                id="counterparty"
-                                value={counterparty}
-                                onChange={onChangeCounterparty}
-                                className={''}
+                                value={organization?.id || ''}
+                                onChange={(e) => selectOrganization(Number(e.target.value))}
+                                aria-label="Организация"
                             >
-                                {counterparties.map(i => (
-                                    <option key={i.id} value={i.id}>{i.name}</option>
+                                {state.organizations.map(o => (
+                                    <option key={o.id} value={o.id}>{o.name}</option>
                                 ))}
                             </select>
-                        </div>
-                    </div>
-
-                    <button
-                        id="buttonTaskMenu"
-                        className="tg-button primary"
-                        onClick={() => handleButtonClick(`InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state?.hasItems ? 1 : 0}`)}
-                    >
-                        📝 Создать счет{state?.hasItems ? ` (строк из файла: ${state.itemsCount})` : ''}
-                    </button>
-
-                    {state?.hasInvoice
-                        ? <button
-                            id="buttonTaskMenu"
-                            className="tg-button primary"
-                            onClick={() => handleButtonClick('PaymentOrder')}
-                        >
-                            📝 Создать пп на {state.invoice.sum} руб.
-                        </button>
-                        : null
+                        )
+                        : <strong>{organization?.name}</strong>
                     }
                 </div>
-                <button className="main-action-button" onClick={onClose}>
-                    Закрыть
-                </button>
+
+                {state.hasInvoice && (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                        Готов счёт к оплате: ИНН {state.invoice.supplierINN}, {state.invoice.sum} ₽
+                    </p>
+                )}
             </div>
-        </>
+
+            <div className="tiles">
+                {MENU.map(section => (
+                    <button
+                        key={section.key}
+                        className="tile"
+                        onClick={() => navigate(`/Section/${section.key}`)}
+                    >
+                        <span
+                            className="tile-icon"
+                            style={{ background: `${section.color}20`, color: section.color }}
+                        >
+                            {section.icon}
+                        </span>
+                        <span className="tile-title">{section.title}</span>
+                        <span className="tile-hint">{section.hint}</span>
+                    </button>
+                ))}
+            </div>
+
+            <button className="btn ghost" style={{ marginTop: 16 }} onClick={onClose}>Закрыть</button>
+        </div>
     )
 }
 
