@@ -103,6 +103,13 @@ export const resetData = async (): Promise<void> => {
     }
 }
 
+export interface ICheckWarning {
+    code: string
+    // strong - потребуется согласование бухгалтером
+    level: 'warning' | 'strong'
+    message: string
+}
+
 export interface IRequestCard {
     uuid: string
     type: string
@@ -111,6 +118,7 @@ export interface IRequestCard {
     // После отправки в 1С править поздно
     editable: boolean
     payload: { supplierINN?: string, buyerINN?: string, sum?: number, [key: string]: any }
+    warnings: ICheckWarning[]
     recognized: { supplierINN?: string, buyerINN?: string, sum?: number } | null
     organizationId: number | null
     createdAt: string

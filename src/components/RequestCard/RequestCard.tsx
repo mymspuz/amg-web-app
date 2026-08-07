@@ -116,6 +116,21 @@ const RequestCard = () => {
             <form className="adaptive-form">
                 {error && <div className="error-message">{error}</div>}
 
+                {/* Проверки раздела 6.4: строгие ведут к согласованию бухгалтером */}
+                {Boolean(request?.warnings?.length) && (
+                    <fieldset className="form-section">
+                        <legend>Обратите внимание</legend>
+                        {request?.warnings.map(w => (
+                            <div key={w.code} className={w.level === 'strong' ? 'error-message' : 'hint'}>
+                                {w.level === 'strong' ? '‼️ ' : '⚠️ '}{w.message}
+                            </div>
+                        ))}
+                        {request?.warnings.some(w => w.level === 'strong') && (
+                            <p className="hint">После подтверждения заявка уйдет на согласование бухгалтеру.</p>
+                        )}
+                    </fieldset>
+                )}
+
                 <fieldset className="form-section">
                     <div className="input-group">
                         <label htmlFor="supplierINN" className="required">ИНН поставщика</label>
