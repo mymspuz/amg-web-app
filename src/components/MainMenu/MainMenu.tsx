@@ -1,20 +1,20 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import './MainMenu.css'
+import '../../theme/theme1c.css'
 
-import counterparties from '../../data/counterparty.json'
 import { acceptConsent } from '../../api/client'
+import { MENU } from '../../data/menu'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
+// Главное меню по разделу 5 ТЗ: разделы плитками, внутри - пункты.
+// Нереализованные пункты видны, но неактивны - так понятен объем сервиса
 const MainMenu = () => {
-    const [counterparty, setCounterparty] = useState<number>(counterparties[0].id)
-    const [consentError, setConsentError] = useState<string>('')
-
     const navigate = useNavigate()
     const { onClose, hideMainButton } = useTelegram()
-    const { state, loading, error, organization, selectOrganization, can, reload } = useAppState()
+    const { state, loading, error, organization, selectOrganization, reload } = useAppState()
+    const [consentError, setConsentError] = React.useState('')
 
     hideMainButton()
 
@@ -28,131 +28,106 @@ const MainMenu = () => {
     }
 
     if (loading) {
-        return <div className="telegram-container"><div className="header"><h3>Загрузка...</h3></div></div>
+        return <div className="app"><p className="muted">Загрузка...</p></div>
     }
 
     if (error) {
         return (
-            <div className="telegram-container">
-                <div className="header"><h1>AMG</h1></div>
-                <div className="error-message">{error}</div>
-                <button className="main-action-button" onClick={reload}>Повторить</button>
+            <div className="app">
+                <div className="notice error">{error}</div>
+                <button className="btn primary" onClick={reload}>Повторить</button>
             </div>
         )
     }
 
     const access = state?.user.accessStatus
 
-    // Доступ еще не выдан или заблокирован - показываем понятный экран,
-    // а не пустое меню с неработающими кнопками
     if (access !== 'active') {
         return (
-            <div className="telegram-container">
-                <div className="header">
-                    <h1>AMG</h1>
-                    <h3>{state?.fullName}</h3>
-                </div>
-                <div className="error-message">
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">
                     {access === 'blocked'
                         ? 'Доступ заблокирован. Обратитесь в АМГ.'
-                        : 'Доступ еще не выдан. Обратитесь в АМГ за ссылкой-приглашением или отправьте боту свой номер телефона.'}
+                        : 'Доступ ещё не выдан. Обратитесь в АМГ за ссылкой-приглашением или отправьте боту свой номер телефона.'}
                 </div>
-                <button className="main-action-button" onClick={onClose}>Закрыть</button>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
             </div>
         )
     }
 
     if (!state?.user.hasConsent) {
         return (
-            <div className="telegram-container">
-                <div className="header">
-                    <h1>AMG</h1>
-                    <h3>{state?.fullName}</h3>
-                </div>
-                <p>Для работы с ботом требуется согласие на обработку персональных данных.</p>
-                {consentError && <div className="error-message">{consentError}</div>}
-                <button className="tg-button primary" onClick={onAcceptConsent}>Принимаю условия</button>
-                <button className="main-action-button" onClick={onClose}>Закрыть</button>
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">Для работы с сервисом требуется согласие на обработку персональных данных.</div>
+                {consentError && <div className="notice error">{consentError}</div>}
+                <button className="btn primary" onClick={onAcceptConsent}>Принимаю условия</button>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
             </div>
         )
     }
 
     if (!state.organizations.length) {
         return (
-            <div className="telegram-container">
-                <div className="header">
-                    <h1>AMG</h1>
-                    <h3>{state.fullName}</h3>
-                </div>
-                <div className="error-message">Вам пока не назначена ни одна организация. Обратитесь в АМГ.</div>
-                <button className="main-action-button" onClick={onClose}>Закрыть</button>
+            <div className="app">
+                <h1>АМГ</h1>
+                <div className="notice">Вам пока не назначена ни одна организация. Обратитесь в АМГ.</div>
+                <button className="btn ghost" onClick={onClose}>Закрыть</button>
             </div>
         )
     }
 
     return (
-        <div className="telegram-container">
-            <div className="header">
-                <h1>AMG</h1>
-                <h3>{state.fullName}</h3>
-            </div>
+        <div className="app">
+            <div className="app-header">
+                <h1>АМГ</h1>
+                <span className="muted">{state.fullName}</span>
 
-            <div className="buttons-container">
-                {/* Организация-плательщик. Выбор нужен тем, у кого их несколько */}
-                {state.organizations.length > 1 && (
-                    <div className="input-row">
-                        <div className="input-group">
-                            <label htmlFor="organization">Организация</label>
+                <div className="org-row">
+                    {state.organizations.length > 1
+                        ? (
                             <select
-                                id="organization"
                                 value={organization?.id || ''}
                                 onChange={(e) => selectOrganization(Number(e.target.value))}
+                                aria-label="Организация"
                             >
                                 {state.organizations.map(o => (
                                     <option key={o.id} value={o.id}>{o.name}</option>
                                 ))}
                             </select>
-                        </div>
-                    </div>
-                )}
-                {state.organizations.length === 1 && (
-                    <p className="organization-name">{organization?.name}</p>
-                )}
-
-                <div className="input-row">
-                    <div className="input-group half">
-                        <select
-                            id="counterparty"
-                            value={counterparty}
-                            onChange={(e) => setCounterparty(Number(e.target.value))}
-                        >
-                            {counterparties.map(i => (
-                                <option key={i.id} value={i.id}>{i.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                        )
+                        : <strong>{organization?.name}</strong>
+                    }
                 </div>
 
-                {can('create') && (
-                    <button
-                        className="tg-button primary"
-                        onClick={() => navigate(`/InvoiceForPayment?counterpartyId=${counterparty}&fromFile=${state.hasItems ? 1 : 0}`)}
-                    >
-                        📝 Создать счет{state.hasItems ? ` (строк из файла: ${state.itemsCount})` : ''}
-                    </button>
-                )}
-
-                {state.hasInvoice && can('confirm') && (
-                    <button
-                        className="tg-button primary"
-                        onClick={() => navigate('/PaymentOrder')}
-                    >
-                        📝 Создать пп на {state.invoice.sum} руб.
-                    </button>
+                {state.hasInvoice && (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                        Готов счёт к оплате: ИНН {state.invoice.supplierINN}, {state.invoice.sum} ₽
+                    </p>
                 )}
             </div>
 
-            <button className="main-action-button" onClick={onClose}>Закрыть</button>
+            <div className="tiles">
+                {MENU.map(section => (
+                    <button
+                        key={section.key}
+                        className="tile"
+                        onClick={() => navigate(`/Section/${section.key}`)}
+                    >
+                        <span
+                            className="tile-icon"
+                            style={{ background: `${section.color}20`, color: section.color }}
+                        >
+                            {section.icon}
+                        </span>
+                        <span className="tile-title">{section.title}</span>
+                        <span className="tile-hint">{section.hint}</span>
+                    </button>
+                ))}
+            </div>
+
+            <button className="btn ghost" style={{ marginTop: 16 }} onClick={onClose}>Закрыть</button>
         </div>
     )
 }

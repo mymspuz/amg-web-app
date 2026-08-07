@@ -6,6 +6,8 @@ import MainMenu from './components/MainMenu/MainMenu'
 import InvoiceForPayment from './components/InvoiceForPayment/InvoiceForPayment'
 import PaymentOrder from "./components/PaymentOrder/PaymentOrder";
 import RequestCard from "./components/RequestCard/RequestCard";
+import Section from "./components/Section/Section";
+import Requests from "./components/Requests/Requests";
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
                 <Route path={'/InvoiceForPayment'} element={<InvoiceForPayment />} />
                 <Route path={'/PaymentOrder'} element={<PaymentOrder />} />
                 <Route path={'/Request/:uuid'} element={<RequestCard />} />
+                <Route path={'/Section/:key'} element={<Section />} />
+                <Route path={'/Requests'} element={<Requests />} />
             </Routes>
         </HashRouter>
     </div>

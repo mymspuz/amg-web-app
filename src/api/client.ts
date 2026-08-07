@@ -149,3 +149,20 @@ export const cancelRequest = async (uuid: string): Promise<void> => {
         throw new Error(errorText(error))
     }
 }
+
+export interface IRequestListItem {
+    uuid: string
+    type: string
+    status: string
+    statusTitle: string
+    sum: number | null
+    supplierINN: string | null
+    doc: string | null
+    error: string | null
+    createdAt: string
+}
+
+export const fetchRequests = async (): Promise<IRequestListItem[]> => {
+    const { data } = await api.get<{ status: boolean, requests: IRequestListItem[] }>('/requests')
+    return data.requests
+}
