@@ -69,7 +69,7 @@ const PayInvoice = () => {
                     <span>
                         Загрузить счёт
                         <span className="tile-hint" style={{ display: 'block' }}>
-                            PDF с текстовым слоем. Сканы пока не распознаём
+                            PDF, скан или фотография. Изображение распознаём, это занимает несколько секунд
                         </span>
                     </span>
                     <span className="badge accent">{uploading ? 'Разбираем...' : 'Выбрать файл'}</span>
@@ -89,7 +89,7 @@ const PayInvoice = () => {
             <input
                 ref={fileInput}
                 type="file"
-                accept="application/pdf"
+                accept="application/pdf,image/*"
                 style={{ display: 'none' }}
                 onChange={onFile}
             />
