@@ -102,6 +102,9 @@ const RequestCard = () => {
         )
     }
 
+    // Не все поля могли распознаться - подскажем, что их надо дозаполнить
+    const isComplete = Boolean(form.supplierINN && form.buyerINN && form.sum)
+
     // Показываем, что именно распознали, если пользователь уже правил
     const recognized = request?.recognized
     const changed = (field: keyof IForm): boolean =>
@@ -115,6 +118,11 @@ const RequestCard = () => {
                 <p>{request?.editable
                     ? 'Проверьте распознанные данные и исправьте, если нужно'
                     : `Заявка уже в работе: ${request?.statusTitle}`}</p>
+                {request?.editable && !isComplete && (
+                    <div className="error-message">
+                        Часть реквизитов распознать не удалось — заполните пустые поля вручную.
+                    </div>
+                )}
             </div>
 
             <form className="adaptive-form">
