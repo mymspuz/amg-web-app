@@ -19,9 +19,12 @@ interface IItem {
     name: string
     amount: number
     price: number
+    unit: string
 }
 
 interface IFormData {
+    // Основание печатается в шапке счета
+    basis: string
     buyerName: string
     buyerInn: string
     buyerKpp: string
@@ -70,6 +73,7 @@ const InvoiceForPayment = () => {
     const [manual, setManual] = useState<boolean>(false)
 
     const [formData, setFormData] = useState<IFormData>({
+        basis: '',
         buyerName: '',
         buyerInn: '',
         buyerKpp: '',
@@ -81,7 +85,7 @@ const InvoiceForPayment = () => {
     })
 
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
-    const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1 })
+    const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
 
     const supplier = organizations.find(o => o.id === supplierId) || null
@@ -147,7 +151,7 @@ const InvoiceForPayment = () => {
 
     const handleSelectedItem = (item: IItem) => {
         if (item.id === selectedItem.id) {
-            setSelectedItem({ id: 0, name: '', price: 1, amount: 1 })
+            setSelectedItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
         } else {
             setSelectedItem(item)
         }
@@ -157,16 +161,16 @@ const InvoiceForPayment = () => {
         e.stopPropagation()
         const lastId = formData.items.length ? formData.items[formData.items.length - 1].id : 0
         const copyItems = [...formData.items]
-        copyItems.push({ id: lastId + 1, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price })
+        copyItems.push({ id: lastId + 1, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price, unit: newItem.unit || 'шт' })
         setFormData({ ...formData, items: copyItems })
-        setNewItem({ id: 0, name: '', price: 1, amount: 1 })
+        setNewItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
     }
 
     const handleEditNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         const copyItems = formData.items.map(i => (
             i.id === selectedItem.id
-                ? { ...i, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price }
+                ? { ...i, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price, unit: newItem.unit || 'шт' }
                 : i
         ))
         setFormData({ ...formData, items: copyItems })
@@ -175,7 +179,7 @@ const InvoiceForPayment = () => {
     const handleRemoveNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         setFormData({ ...formData, items: formData.items.filter(i => i.id !== selectedItem.id) })
-        setNewItem({ id: 0, name: '', price: 1, amount: 1 })
+        setNewItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
     }
 
     const handleTextInputChange = (
@@ -219,7 +223,8 @@ const InvoiceForPayment = () => {
                 organizationId: supplierId,
                 counterpartyId: buyer ? buyer.id : 0,
                 fromFile: formData.fromFile,
-                items: formData.items.map(i => ({ name: i.name, amount: i.amount, price: i.price })),
+                basis: formData.basis,
+                items: formData.items.map(i => ({ name: i.name, amount: i.amount, price: i.price, unit: i.unit || 'шт' })),
                 buyerName: buyer ? buyer.name : formData.buyerName,
                 buyerInn: buyer ? (buyer.inn || '') : formData.buyerInn,
                 buyerKpp: buyer ? (buyer.kpp || '') : formData.buyerKpp,
@@ -462,6 +467,23 @@ const InvoiceForPayment = () => {
                     }
                 </fieldset>
 
+                <fieldset className="form-section">
+                    <legend>📑 Основание</legend>
+                    <div className="input-group">
+                        <label htmlFor="basis">Договор или основание поставки</label>
+                        <input
+                            id="basis"
+                            type="text"
+                            value={formData.basis}
+                            onChange={handleTextInputChange}
+                            placeholder="Основной договор 26/09 от 26.09.2022"
+                        />
+                        {/* В 1С это ссылка на договор, у нас - текст: договоров
+                            в справочниках бота нет, а строка печатается как есть */}
+                        <span className="muted">Если оставить пустым, в счете будет «Без договора»</span>
+                    </div>
+                </fieldset>
+
                 {!formData.fromFile &&
                     <fieldset className="form-section">
                         <legend>📄 Список работ/услуг</legend>
@@ -476,7 +498,7 @@ const InvoiceForPayment = () => {
                                                 className={`priority-btn ${selectedItem.id === item.id ? 'active' : ''}`}
                                                 onClick={() => handleSelectedItem(item)}
                                             >
-                                                {item.name} ** {item.amount} ** {item.price}
+                                                {item.name} · {item.amount} {item.unit} × {item.price}
                                             </button>
                                         ))}
                                     </div>
@@ -509,6 +531,19 @@ const InvoiceForPayment = () => {
                                     step="0.01"
                                 />
                             </div>
+                            <div className="input-group half">
+                                <label htmlFor="itemUnit">Ед. изм.</label>
+                                <input
+                                    id="itemUnit"
+                                    type="text"
+                                    value={newItem.unit}
+                                    onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                                    placeholder="шт"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="input-row">
                             <div className="input-group half">
                                 <label htmlFor="itemPrice" className="required">Цена</label>
                                 <input

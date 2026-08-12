@@ -77,7 +77,9 @@ export interface IInvoiceRequest {
     // Контрагент из базы 1С. Ноль - покупателя вводят вручную
     counterpartyId: number
     fromFile: boolean
-    items: { name: string, amount: number, price: number }[]
+    // Основание печатается в шапке счета: договор или разовая поставка
+    basis: string
+    items: { name: string, amount: number, price: number, unit: string }[]
     buyerName: string
     buyerInn: string
     buyerKpp: string
