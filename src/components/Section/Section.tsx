@@ -11,7 +11,7 @@ import { useAppState } from '../../hooks/useAppState'
 const Section = () => {
     const { key } = useParams<{ key: string }>()
     const navigate = useNavigate()
-    const { state, organization, can, loading } = useAppState()
+    const { state, can, loading } = useAppState()
 
     const section = findSection(key || '')
 
@@ -36,9 +36,10 @@ const Section = () => {
     const onSelect = (item: IMenuItem) => {
         if (reason(item)) return
 
-        // Счет выставляется от выбранной организации
+        // Организацию-поставщика форма берет из шапки, а покупателя
+        // подбирают в ней самой - передаем только признак загруженных позиций
         if (item.route === '/InvoiceForPayment') {
-            return navigate(`/InvoiceForPayment?counterpartyId=${organization?.id || 1}&fromFile=${state?.hasItems ? 1 : 0}`)
+            return navigate(`/InvoiceForPayment?fromFile=${state?.hasItems ? 1 : 0}`)
         }
 
         navigate(item.route as string)

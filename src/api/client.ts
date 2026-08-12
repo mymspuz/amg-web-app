@@ -74,15 +74,60 @@ export interface IChatState {
 
 export interface IInvoiceRequest {
     organizationId: number
+    // Контрагент из базы 1С. Ноль - покупателя вводят вручную
     counterpartyId: number
     fromFile: boolean
     items: { name: string, amount: number, price: number }[]
     buyerName: string
-    buyerInn: number
-    buyerKpp: number
-    buyerInd: number
+    buyerInn: string
+    buyerKpp: string
+    buyerInd: string
     buyerAddress: string
     buyerPhone: string | null
+}
+
+// Контрагент базы: покупатель в счете
+export interface ICounterparty {
+    id: number
+    name: string
+    inn: string | null
+    kpp: string | null
+    address: string | null
+    phone: string | null
+}
+
+export interface IBankAccount {
+    account: string
+    bik: string | null
+    bankName: string | null
+    corrAccount: string | null
+    isDefault: boolean
+}
+
+// Организация со всеми реквизитами: поставщик в счете
+export interface IOrganizationDetails extends IOrganization {
+    kpp: string | null
+    address: string | null
+    phone: string | null
+    accounts: IBankAccount[]
+}
+
+export const fetchOrganizations = async (): Promise<IOrganizationDetails[]> => {
+    const { data } = await api.get<{ status: boolean, items: IOrganizationDetails[] }>('/organizations')
+
+    return data.items
+}
+
+// Поиск идет на сервере: справочник в базе, а не в приложении
+export const fetchCounterparties = async (
+    search: string,
+    organizationId?: number
+): Promise<ICounterparty[]> => {
+    const { data } = await api.get<{ status: boolean, items: ICounterparty[] }>('/counterparties', {
+        params: { search: search || undefined, organizationId, limit: 30 },
+    })
+
+    return data.items
 }
 
 // Текст ошибки от сервера, а не «Request failed with status code 409»
