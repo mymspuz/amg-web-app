@@ -75,6 +75,57 @@
     color: var(--c-text);
 }
 
+/* Индикатор связи с 1С */
+.conn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 3px 10px 3px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: currentColor;
+}
+
+.conn.online {
+    background: rgba(46, 160, 67, 0.12);
+    color: #1a7f37;
+}
+
+/* Пульсация только у живого соединения: красный и так заметен,
+   а мигание в шапке отвлекало бы от работы */
+.conn.online .conn-dot {
+    animation: conn-pulse 2.4s ease-in-out infinite;
+}
+
+.conn.offline {
+    background: rgba(217, 48, 37, 0.12);
+    color: #c5221f;
+}
+
+@keyframes conn-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .conn.online .conn-dot { animation: none; }
+}
+
+.app-header .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
 /* Сетка разделов */
 .tiles {
     display: grid;

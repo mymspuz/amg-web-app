@@ -19,6 +19,8 @@ export interface IAppState {
     selectOrganization: (id: number) => void
     can: (permission: TPermission) => boolean
     reload: () => void
+    // Обновление без экрана загрузки
+    refresh: () => void
 }
 
 export const useAppState = (): IAppState => {
@@ -27,8 +29,10 @@ export const useAppState = (): IAppState => {
     const [error, setError] = useState<string>('')
     const [organizationId, setOrganizationId] = useState<number | null>(readStored)
 
-    const load = useCallback(() => {
-        setLoading(true)
+    // silent - обновление в фоне: экран не должен мигать «Загрузка...»
+    // каждые полминуты только ради индикатора связи
+    const load = useCallback((silent = false) => {
+        if (!silent) setLoading(true)
         fetchState()
             .then((data) => {
                 setState(data)
@@ -48,10 +52,22 @@ export const useAppState = (): IAppState => {
                 }
             })
             .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить данные от бота'))
-            .finally(() => setLoading(false))
+            .finally(() => {
+                if (!silent) setLoading(false)
+            })
     }, [])
 
-    useEffect(load, [load])
+    useEffect(() => load(), [load])
+
+    // Индикатор связи с 1С должен оставаться живым, пока приложение открыто.
+    // В свернутом виде не опрашиваем: телефон и так экономит батарею
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === 'visible') load(true)
+        }, 30 * 1000)
+
+        return () => window.clearInterval(timer)
+    }, [load])
 
     const selectOrganization = useCallback((id: number) => {
         window.localStorage.setItem(STORAGE_KEY, String(id))
@@ -66,5 +82,14 @@ export const useAppState = (): IAppState => {
         [organization]
     )
 
-    return { state, loading, error, organization, selectOrganization, can, reload: load }
+    return {
+        state,
+        loading,
+        error,
+        organization,
+        selectOrganization,
+        can,
+        reload: () => load(),
+        refresh: () => load(true),
+    }
 }

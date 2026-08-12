@@ -23,8 +23,30 @@ export interface IOrganization {
     id: number
     name: string
     inn: string
+    // Из какой базы 1С организация
+    baseId: number | null
     permissions: TPermission[]
     isDefault: boolean
+}
+
+export interface IBaseState {
+    id: number
+    name: string
+    isDefault: boolean
+    // Справочники выгружены - стороны счета проверяются без обращения к 1С
+    catalogReady: boolean
+    // База опрашивала очередь только что
+    online: boolean
+    lastSeenAt: string | null
+}
+
+// Связь с 1С: обработка обмена опрашивает очередь непрерывно, поэтому
+// свежая отметка опроса и означает живое соединение
+export interface IOneCState {
+    online: boolean
+    total: number
+    onlineCount: number
+    lastSeenAt: string | null
 }
 
 export interface IChatState {
@@ -36,6 +58,8 @@ export interface IChatState {
         hasConsent: boolean
     }
     organizations: IOrganization[]
+    bases: IBaseState[]
+    oneC: IOneCState
     // Загружены строки товаров из файла
     hasItems: boolean
     itemsCount: number

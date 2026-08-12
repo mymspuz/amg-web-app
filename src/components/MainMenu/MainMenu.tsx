@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import '../../theme/theme1c.css'
 
 import { acceptConsent } from '../../api/client'
+import ConnectionStatus from '../ConnectionStatus/ConnectionStatus'
 import { MENU } from '../../data/menu'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
@@ -81,8 +82,17 @@ const MainMenu = () => {
     return (
         <div className="app">
             <div className="app-header">
-                <h1>АМГ</h1>
+                <div className="header-top">
+                    <h1>АМГ</h1>
+                    <ConnectionStatus oneC={state.oneC} bases={state.bases} />
+                </div>
                 <span className="muted">{state.fullName}</span>
+
+                {!state.oneC.online && (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                        Заявки можно оформлять - они уйдут в 1С, как только связь восстановится.
+                    </p>
+                )}
 
                 <div className="org-row">
                     {state.organizations.length > 1
