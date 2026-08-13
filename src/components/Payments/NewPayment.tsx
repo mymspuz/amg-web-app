@@ -221,6 +221,26 @@ const NewPayment = () => {
                     </fieldset>
                 )}
 
+                {/* Карта обычно не заведена в 1С банковским счетом, поэтому
+                    номер вводится строкой: если счет найдется - подставим
+                    ссылкой, если нет - номер уйдет в назначение платежа */}
+                {kind === 'self_card' && (
+                    <fieldset className="form-section">
+                        <legend>💰 Куда переводим</legend>
+                        <div className="input-group">
+                            <label htmlFor="toAccount">Номер карты или счета</label>
+                            <input
+                                id="toAccount"
+                                type="text"
+                                inputMode="numeric"
+                                value={form.toAccount}
+                                onChange={set('toAccount')}
+                                placeholder="40817810..."
+                            />
+                        </div>
+                    </fieldset>
+                )}
+
                 {kind === 'between_accounts' && (
                     <fieldset className="form-section">
                         <legend>🔁 Счет зачисления</legend>
