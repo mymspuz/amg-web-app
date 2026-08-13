@@ -27,5 +27,8 @@ export function useTelegram() {
         user: tg?.initDataUnsafe?.user,
         // Приложение открыто внутри Telegram - только тогда есть подписанные данные
         isTelegram: Boolean(tg?.initData),
+        // Есть родная кнопка отправки внизу окна. Тогда свою в форме
+        // не показываем: две одинаковые кнопки сбивают с толку
+        hasMainButton: Boolean(tg?.MainButton),
     }
 }

@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTelegram } from '../../hooks/useTelegram'
 import { useAppState } from '../../hooks/useAppState'
 
+import '../../theme/forms1c.css'
 import './InvoiceForPayment.css'
 
 import {
@@ -51,7 +52,7 @@ type TPermittedOperations = 'none' | 'add' | 'edit'
 // берутся из 1С, поэтому реквизиты в печатной форме заведомо совпадают
 // с учетом. Ручной ввод покупателя оставлен для разовых сделок
 const InvoiceForPayment = () => {
-    const { onClose, showMainButton } = useTelegram()
+    const { onClose, showMainButton, hasMainButton } = useTelegram()
     const { organization } = useAppState()
 
     const navigate = useNavigate()
@@ -598,9 +599,13 @@ const InvoiceForPayment = () => {
                 {errors.buyer && !manual && !buyer && <span className="error-message">{errors.buyer}</span>}
                 {sendError && <span className="error-message">{sendError}</span>}
 
-                <button type="button" className="tg-button primary" onClick={onSendData}>
-                    Выставить счет
-                </button>
+                {/* В Telegram отправку делает родная кнопка внизу окна -
+                    своя нужна только в браузере */}
+                {!hasMainButton && (
+                    <button type="button" className="tg-button primary" onClick={onSendData}>
+                        Выставить счет
+                    </button>
+                )}
             </form>
         </div>
     )

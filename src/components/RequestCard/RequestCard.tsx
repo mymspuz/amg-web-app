@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import '../../theme/forms1c.css'
 import '../PaymentOrder/PaymentOrder.css'
 
 import { cancelRequest, confirmRequest, fetchRequest, fetchRequestEvents, IRequestCard, IRequestEvent } from '../../api/client'
@@ -17,7 +18,7 @@ interface IForm {
 const RequestCard = () => {
     const { uuid } = useParams<{ uuid: string }>()
     const navigate = useNavigate()
-    const { onClose, showMainButton } = useTelegram()
+    const { onClose, showMainButton, hasMainButton } = useTelegram()
 
     const [request, setRequest] = useState<IRequestCard | null>(null)
     const [events, setEvents] = useState<IRequestEvent[]>([])
@@ -199,9 +200,12 @@ const RequestCard = () => {
 
                 {request?.editable && (
                     <fieldset className="form-section">
-                        <button type="button" className="tg-button primary" onClick={onConfirm} disabled={sending}>
-                            {sending ? 'Отправляем...' : 'Подтвердить и отправить в 1С'}
-                        </button>
+                        {/* В Telegram подтверждение делает родная кнопка внизу окна */}
+                        {!hasMainButton && (
+                            <button type="button" className="tg-button primary" onClick={onConfirm} disabled={sending}>
+                                {sending ? 'Отправляем...' : 'Подтвердить и отправить в 1С'}
+                            </button>
+                        )}
                         <button type="button" className="main-action-button" onClick={onCancel} disabled={sending}>
                             Отменить заявку
                         </button>

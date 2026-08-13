@@ -1,6 +1,7 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import '../../theme/forms1c.css'
 import './PaymentOrder.css'
 
 import { sendPaymentOrder } from '../../api/client'
@@ -14,7 +15,7 @@ interface IFormData {
 
 const PaymentOrder = () => {
     const navigate = useNavigate()
-    const { onClose, showMainButton } = useTelegram()
+    const { onClose, showMainButton, hasMainButton } = useTelegram()
     const { state, loading, organization, can } = useAppState()
 
     const clients = [
@@ -148,14 +149,17 @@ const PaymentOrder = () => {
                         ))}
                     </select>
 
-                    <button
-                        type="button"
-                        className="tg-button primary"
-                        onClick={onSendData}
-                        disabled={sending || !state?.hasInvoice || !canConfirm}
-                    >
-                        {sending ? 'Отправляем...' : 'Создать платежное поручение'}
-                    </button>
+                    {/* В Telegram отправку делает родная кнопка внизу окна */}
+                    {!hasMainButton && (
+                        <button
+                            type="button"
+                            className="tg-button primary"
+                            onClick={onSendData}
+                            disabled={sending || !state?.hasInvoice || !canConfirm}
+                        >
+                            {sending ? 'Отправляем...' : 'Создать платежное поручение'}
+                        </button>
+                    )}
                 </fieldset>
             </form>
         </div>
