@@ -114,6 +114,42 @@ export interface IOrganizationDetails extends IOrganization {
     accounts: IBankAccount[]
 }
 
+// Виды операций из ТЗ. Файл можно приложить не ко всем: перевод себе
+// и между своими счетами вводят только руками
+export type TPaymentKind = 'self_card' | 'supplier' | 'between_accounts' | 'salary'
+
+export interface IPaymentDraft {
+    kind: TPaymentKind
+    organizationId: number
+    sum?: string
+    comment?: string
+    counterpartyId?: number
+    supplierINN?: string
+    supplierAccount?: string
+    fromAccount?: string
+    toAccount?: string
+    employeeName?: string
+    employeeAccount?: string
+}
+
+// Возвращает uuid заявки: дальше открывается карточка подтверждения -
+// та же, что и после распознавания счета
+export const createPayment = async (draft: IPaymentDraft, file?: File | null): Promise<string> => {
+    const form = new FormData()
+    Object.entries(draft).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') form.append(key, String(value))
+    })
+    if (file) form.append('file', file)
+
+    try {
+        const { data } = await api.post<{ status: boolean, uuid: string }>('/payments', form)
+
+        return data.uuid
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
 export const fetchOrganizations = async (): Promise<IOrganizationDetails[]> => {
     const { data } = await api.get<{ status: boolean, items: IOrganizationDetails[] }>('/organizations')
 
@@ -184,6 +220,8 @@ export interface ICheckWarning {
 export interface IRequestCard {
     uuid: string
     type: string
+    // Вид операции у платежей: от него зависят поля карточки
+    paymentKind: TPaymentKind | null
     status: string
     statusTitle: string
     // После отправки в 1С править поздно
@@ -203,7 +241,7 @@ export const fetchRequest = async (uuid: string): Promise<IRequestCard> => {
 // Подтверждение карточки: сюда же уходят правки пользователя
 export const confirmRequest = async (
     uuid: string,
-    values: { supplierINN: string, buyerINN: string, sum: number }
+    values: { supplierINN: string, buyerINN: string, sum: number, comment?: string }
 ): Promise<string[]> => {
     try {
         const { data } = await api.post<{ status: boolean, corrected: string[] }>(`/requests/${uuid}/confirm`, values)

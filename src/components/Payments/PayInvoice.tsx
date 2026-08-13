@@ -75,6 +75,16 @@ const PayInvoice = () => {
                     <span className="badge accent">{uploading ? 'Разбираем...' : 'Выбрать файл'}</span>
                 </button>
 
+                <button className="list-item" onClick={() => navigate('/Payment/supplier')}>
+                    <span>
+                        Ввести реквизиты вручную
+                        <span className="tile-hint" style={{ display: 'block' }}>
+                            Получателя можно выбрать из справочника 1С
+                        </span>
+                    </span>
+                    <span className="badge accent">Заполнить</span>
+                </button>
+
                 <button className="list-item" disabled>
                     <span>
                         Отправить счёт боту в чат

@@ -11,6 +11,15 @@ interface IForm {
     supplierINN: string
     buyerINN: string
     sum: string
+    comment: string
+}
+
+// Что показывать в карточке платежа: у каждого вида операции свои поля
+const KIND_TITLES: Record<string, string> = {
+    self_card: '💰 Себе на карту',
+    supplier: '🏭 Оплата поставщику',
+    between_accounts: '🔁 Между своими счетами',
+    salary: '👥 Выплата зарплаты',
 }
 
 // Карточка распознанного счета. В 1С заявка уходит только отсюда:
@@ -22,7 +31,7 @@ const RequestCard = () => {
 
     const [request, setRequest] = useState<IRequestCard | null>(null)
     const [events, setEvents] = useState<IRequestEvent[]>([])
-    const [form, setForm] = useState<IForm>({ supplierINN: '', buyerINN: '', sum: '' })
+    const [form, setForm] = useState<IForm>({ supplierINN: '', buyerINN: '', sum: '', comment: '' })
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
     const [error, setError] = useState('')
@@ -37,6 +46,7 @@ const RequestCard = () => {
                     supplierINN: String(data.payload.supplierINN || ''),
                     buyerINN: String(data.payload.buyerINN || ''),
                     sum: String(data.payload.sum ?? ''),
+                    comment: String(data.payload.comment || ''),
                 })
             })
             .catch((e) => setError(e?.response?.data?.error || 'Заявка не найдена'))
@@ -46,11 +56,19 @@ const RequestCard = () => {
         fetchRequestEvents(uuid).then(setEvents).catch(() => setEvents([]))
     }, [uuid])
 
-    // ИНН бывает 10 знаков у организаций и 12 у предпринимателей
+    // Платеж себе или между своими счетами обходится без ИНН получателя,
+    // поэтому проверяем только то, что относится к виду операции
+    const needsCounterparty = !request?.paymentKind || request.paymentKind === 'supplier'
+
     const validate = (): string => {
-        if (!/^\d{10}$|^\d{12}$/.test(form.supplierINN)) return 'ИНН поставщика должен содержать 10 или 12 цифр'
-        if (!/^\d{10}$|^\d{12}$/.test(form.buyerINN)) return 'ИНН покупателя должен содержать 10 или 12 цифр'
         if (!Number(form.sum)) return 'Укажите сумму'
+
+        if (needsCounterparty) {
+            if (!/^\d{10}$|^\d{12}$/.test(form.supplierINN)) return 'ИНН получателя должен содержать 10 или 12 цифр'
+            // ИНН плательщика подставляется из организации - проверяем,
+            // только если он вообще заполнен
+            if (form.buyerINN && !/^\d{10}$|^\d{12}$/.test(form.buyerINN)) return 'ИНН плательщика должен содержать 10 или 12 цифр'
+        }
 
         return ''
     }
@@ -66,6 +84,7 @@ const RequestCard = () => {
                 supplierINN: form.supplierINN,
                 buyerINN: form.buyerINN,
                 sum: Number(form.sum),
+                comment: form.comment,
             })
             onClose()
         } catch (e) {
@@ -145,31 +164,62 @@ const RequestCard = () => {
                 )}
 
                 <fieldset className="form-section">
-                    <div className="input-group">
-                        <label htmlFor="supplierINN" className="required">ИНН поставщика</label>
-                        <input
-                            id="supplierINN"
-                            type="text"
-                            inputMode="numeric"
-                            value={form.supplierINN}
-                            onChange={(e) => setForm({ ...form, supplierINN: e.target.value.replace(/\D/g, '') })}
-                            disabled={!request?.editable}
-                        />
-                        {changed('supplierINN') && <span className="hint">Распознано: {recognized?.supplierINN}</span>}
-                    </div>
+                    {/* Вид операции виден сразу: в истории заявок платежи
+                        разных видов лежат вперемешку */}
+                    {request?.paymentKind && (
+                        <legend>{KIND_TITLES[request.paymentKind] || 'Платеж'}</legend>
+                    )}
 
-                    <div className="input-group">
-                        <label htmlFor="buyerINN" className="required">ИНН покупателя</label>
-                        <input
-                            id="buyerINN"
-                            type="text"
-                            inputMode="numeric"
-                            value={form.buyerINN}
-                            onChange={(e) => setForm({ ...form, buyerINN: e.target.value.replace(/\D/g, '') })}
-                            disabled={!request?.editable}
-                        />
-                        {changed('buyerINN') && <span className="hint">Распознано: {recognized?.buyerINN}</span>}
-                    </div>
+                    {needsCounterparty && (
+                        <>
+                            <div className="input-group">
+                                <label htmlFor="supplierINN" className="required">ИНН получателя</label>
+                                <input
+                                    id="supplierINN"
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={form.supplierINN}
+                                    onChange={(e) => setForm({ ...form, supplierINN: e.target.value.replace(/\D/g, '') })}
+                                    disabled={!request?.editable}
+                                />
+                                {request?.payload.supplierName && (
+                                    <span className="hint">{request.payload.supplierName}</span>
+                                )}
+                                {changed('supplierINN') && <span className="hint">Распознано: {recognized?.supplierINN}</span>}
+                            </div>
+
+                            <div className="input-group">
+                                <label htmlFor="buyerINN">ИНН плательщика</label>
+                                <input
+                                    id="buyerINN"
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={form.buyerINN}
+                                    onChange={(e) => setForm({ ...form, buyerINN: e.target.value.replace(/\D/g, '') })}
+                                    disabled={!request?.editable}
+                                />
+                                {changed('buyerINN') && <span className="hint">Распознано: {recognized?.buyerINN}</span>}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Реквизиты, которые правит не пользователь, а форма
+                        создания платежа - показываем как есть */}
+                    {request?.paymentKind === 'between_accounts' && (
+                        <div className="party-card">
+                            <div className="party-line">Со счета {request.payload.fromAccount || '—'}</div>
+                            <div className="party-line">На счет {request.payload.toAccount || '—'}</div>
+                        </div>
+                    )}
+
+                    {request?.paymentKind === 'salary' && (
+                        <div className="party-card">
+                            <div className="party-line">{request.payload.employeeName || 'По ведомости'}</div>
+                            {request.payload.employeeAccount && (
+                                <div className="party-line muted">Счет {request.payload.employeeAccount}</div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="input-group">
                         <label htmlFor="sum" className="required">Сумма</label>
@@ -183,6 +233,19 @@ const RequestCard = () => {
                         />
                         {changed('sum') && <span className="hint">Распознано: {recognized?.sum}</span>}
                     </div>
+
+                    {request?.paymentKind && (
+                        <div className="input-group">
+                            <label htmlFor="comment">Назначение платежа</label>
+                            <input
+                                id="comment"
+                                type="text"
+                                value={form.comment}
+                                onChange={(e) => setForm({ ...form, comment: e.target.value })}
+                                disabled={!request?.editable}
+                            />
+                        </div>
+                    )}
                 </fieldset>
 
                 {events.length > 1 && (

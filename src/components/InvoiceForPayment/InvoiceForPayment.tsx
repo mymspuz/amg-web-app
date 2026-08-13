@@ -8,12 +8,12 @@ import '../../theme/forms1c.css'
 import './InvoiceForPayment.css'
 
 import {
-    fetchCounterparties,
     fetchOrganizations,
     ICounterparty,
     IOrganizationDetails,
     sendInvoice,
 } from '../../api/client'
+import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
 
 interface IItem {
     id: number
@@ -67,9 +67,6 @@ const InvoiceForPayment = () => {
     const [supplierId, setSupplierId] = useState<number>(0)
 
     // Покупатель - контрагент из базы либо ручной ввод
-    const [query, setQuery] = useState<string>('')
-    const [found, setFound] = useState<ICounterparty[]>([])
-    const [searching, setSearching] = useState<boolean>(false)
     const [buyer, setBuyer] = useState<ICounterparty | null>(null)
     const [manual, setManual] = useState<boolean>(false)
 
@@ -103,43 +100,14 @@ const InvoiceForPayment = () => {
             .catch(e => setSendError(e instanceof Error ? e.message : String(e)))
     }, [organization])
 
-    // Поиск контрагентов идет на сервере, поэтому не дергаем его на каждую
-    // букву: ждем, пока человек допечатает
-    useEffect(() => {
-        if (manual || buyer) return
-
-        const text = query.trim()
-        if (text.length < 2) {
-            setFound([])
-
-            return
-        }
-
-        setSearching(true)
-        const timer = window.setTimeout(() => {
-            fetchCounterparties(text, supplierId || undefined)
-                .then(setFound)
-                .catch(() => setFound([]))
-                .finally(() => setSearching(false))
-        }, 350)
-
-        return () => {
-            window.clearTimeout(timer)
-            setSearching(false)
-        }
-    }, [query, supplierId, manual, buyer])
-
     const selectBuyer = (item: ICounterparty) => {
         setBuyer(item)
-        setFound([])
-        setQuery('')
         setErrors(prev => ({ ...prev, buyer: '' }))
     }
 
     const resetBuyer = () => {
         setBuyer(null)
         setManual(false)
-        setQuery('')
     }
 
     const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, name: e.target.value })
@@ -320,152 +288,109 @@ const InvoiceForPayment = () => {
                 <fieldset className="form-section">
                     <legend>👤 Покупатель</legend>
 
-                    {buyer
-                        ? (
-                            <div className="party-card">
-                                <div className="party-line"><strong>{buyer.name}</strong></div>
-                                <div className="party-line muted">
-                                    ИНН {buyer.inn || '—'}{buyer.kpp ? ` · КПП ${buyer.kpp}` : ''}
-                                </div>
-                                {buyer.address && <div className="party-line muted">{buyer.address}</div>}
-                                <button type="button" className="tg-button secondary" onClick={resetBuyer}>
-                                    Выбрать другого
-                                </button>
+                    {/* В ручном режиме поиск не нужен: покупателя вписывают
+                        полями ниже */}
+                    {!manual && (
+                        <CounterpartyPicker
+                            organizationId={supplierId}
+                            selected={buyer}
+                            onSelect={selectBuyer}
+                            onClear={resetBuyer}
+                            label="Найдите покупателя по названию или ИНН"
+                            error={errors.buyer}
+                        />
+                    )}
+
+                    {manual && (
+                        <>
+                            <div className="input-group">
+                                <label htmlFor="buyerName" className="required">Наименование</label>
+                                <input
+                                    id="buyerName"
+                                    type="text"
+                                    value={formData.buyerName}
+                                    onChange={handleTextInputChange}
+                                    placeholder="ООО Техно"
+                                    className={errors.buyerName ? 'error' : ''}
+                                />
+                                {errors.buyerName && <span className="error-message">{errors.buyerName}</span>}
                             </div>
-                        )
-                        : manual
-                            ? (
-                                <>
-                                    <div className="input-group">
-                                        <label htmlFor="buyerName" className="required">Наименование</label>
-                                        <input
-                                            id="buyerName"
-                                            type="text"
-                                            value={formData.buyerName}
-                                            onChange={handleTextInputChange}
-                                            placeholder="ООО Техно"
-                                            className={errors.buyerName ? 'error' : ''}
-                                        />
-                                        {errors.buyerName && <span className="error-message">{errors.buyerName}</span>}
-                                    </div>
 
-                                    <div className="input-row">
-                                        <div className="input-group half">
-                                            <label htmlFor="buyerInn" className="required">ИНН</label>
-                                            <input
-                                                id="buyerInn"
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={formData.buyerInn}
-                                                onChange={handleTextInputChange}
-                                                placeholder="ИНН"
-                                                className={errors.buyerInn ? 'error' : ''}
-                                            />
-                                            {errors.buyerInn && <span className="error-message">{errors.buyerInn}</span>}
-                                        </div>
-                                        <div className="input-group half">
-                                            <label htmlFor="buyerKpp">КПП</label>
-                                            <input
-                                                id="buyerKpp"
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={formData.buyerKpp}
-                                                onChange={handleTextInputChange}
-                                                placeholder="КПП"
-                                            />
-                                        </div>
-                                    </div>
+                            <div className="input-row">
+                                <div className="input-group half">
+                                    <label htmlFor="buyerInn" className="required">ИНН</label>
+                                    <input
+                                        id="buyerInn"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formData.buyerInn}
+                                        onChange={handleTextInputChange}
+                                        placeholder="ИНН"
+                                        className={errors.buyerInn ? 'error' : ''}
+                                    />
+                                    {errors.buyerInn && <span className="error-message">{errors.buyerInn}</span>}
+                                </div>
+                                <div className="input-group half">
+                                    <label htmlFor="buyerKpp">КПП</label>
+                                    <input
+                                        id="buyerKpp"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formData.buyerKpp}
+                                        onChange={handleTextInputChange}
+                                        placeholder="КПП"
+                                    />
+                                </div>
+                            </div>
 
-                                    <div className="input-row">
-                                        <div className="input-group half">
-                                            <label htmlFor="buyerInd">Индекс</label>
-                                            <input
-                                                id="buyerInd"
-                                                type="text"
-                                                inputMode="numeric"
-                                                value={formData.buyerInd}
-                                                onChange={handleTextInputChange}
-                                                placeholder="Индекс"
-                                            />
-                                        </div>
-                                        <div className="input-group half">
-                                            <label htmlFor="buyerPhone">Телефон</label>
-                                            <input
-                                                id="buyerPhone"
-                                                type="text"
-                                                value={formData.buyerPhone || ''}
-                                                onChange={handleTextInputChange}
-                                                placeholder="+7 (999) 999-99-99"
-                                            />
-                                        </div>
-                                    </div>
+                            <div className="input-row">
+                                <div className="input-group half">
+                                    <label htmlFor="buyerInd">Индекс</label>
+                                    <input
+                                        id="buyerInd"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formData.buyerInd}
+                                        onChange={handleTextInputChange}
+                                        placeholder="Индекс"
+                                    />
+                                </div>
+                                <div className="input-group half">
+                                    <label htmlFor="buyerPhone">Телефон</label>
+                                    <input
+                                        id="buyerPhone"
+                                        type="text"
+                                        value={formData.buyerPhone || ''}
+                                        onChange={handleTextInputChange}
+                                        placeholder="+7 (999) 999-99-99"
+                                    />
+                                </div>
+                            </div>
 
-                                    <div className="input-group">
-                                        <label htmlFor="buyerAddress" className="required">Адрес</label>
-                                        <input
-                                            id="buyerAddress"
-                                            type="text"
-                                            value={formData.buyerAddress}
-                                            onChange={handleTextInputChange}
-                                            placeholder="Адрес"
-                                            className={errors.buyerAddress ? 'error' : ''}
-                                        />
-                                        {errors.buyerAddress && <span className="error-message">{errors.buyerAddress}</span>}
-                                    </div>
+                            <div className="input-group">
+                                <label htmlFor="buyerAddress" className="required">Адрес</label>
+                                <input
+                                    id="buyerAddress"
+                                    type="text"
+                                    value={formData.buyerAddress}
+                                    onChange={handleTextInputChange}
+                                    placeholder="Адрес"
+                                    className={errors.buyerAddress ? 'error' : ''}
+                                />
+                                {errors.buyerAddress && <span className="error-message">{errors.buyerAddress}</span>}
+                            </div>
 
-                                    <button type="button" className="tg-button secondary" onClick={resetBuyer}>
-                                        Выбрать из базы
-                                    </button>
-                                </>
-                            )
-                            : (
-                                <>
-                                    <div className="input-group">
-                                        <label htmlFor="buyerSearch" className="required">
-                                            Найдите контрагента по названию или ИНН
-                                        </label>
-                                        <input
-                                            id="buyerSearch"
-                                            type="text"
-                                            value={query}
-                                            onChange={(e) => setQuery(e.target.value)}
-                                            placeholder="Например, Техно или 7724727585"
-                                            autoComplete="off"
-                                            className={errors.buyer ? 'error' : ''}
-                                        />
-                                        {errors.buyer && <span className="error-message">{errors.buyer}</span>}
-                                    </div>
+                            <button type="button" className="tg-button secondary" onClick={resetBuyer}>
+                                Выбрать из базы
+                            </button>
+                        </>
+                    )}
 
-                                    {searching && <p className="muted">Ищем...</p>}
-
-                                    {!searching && query.trim().length >= 2 && !found.length && (
-                                        <p className="muted">Ничего не нашлось. Проверьте написание или введите покупателя вручную.</p>
-                                    )}
-
-                                    {found.length > 0 && (
-                                        <div className="search-results">
-                                            {found.map(item => (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    className="search-result"
-                                                    onClick={() => selectBuyer(item)}
-                                                >
-                                                    <span className="search-result-name">{item.name}</span>
-                                                    <span className="search-result-inn">
-                                                        ИНН {item.inn || '—'}{item.kpp ? ` · КПП ${item.kpp}` : ''}
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <button type="button" className="tg-button secondary" onClick={() => setManual(true)}>
-                                        Ввести вручную
-                                    </button>
-                                </>
-                            )
-                    }
+                    {!manual && !buyer && (
+                        <button type="button" className="tg-button secondary" onClick={() => setManual(true)}>
+                            Ввести вручную
+                        </button>
+                    )}
                 </fieldset>
 
                 <fieldset className="form-section">

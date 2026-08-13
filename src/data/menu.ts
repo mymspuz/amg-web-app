@@ -30,8 +30,13 @@ export const MENU: IMenuSection[] = [
         icon: '💳',
         color: '#1c67d9',
         hint: 'Оплата счетов и статусы',
+        // Виды операций из ТЗ заказчика. Файл прикладывают не ко всем:
+        // перевод себе и между своими счетами заполняются только вручную
         items: [
-            { key: 'pay', title: 'Оплатить счёт', route: '/PayInvoice', permission: 'create', hint: 'Загрузите счёт или пришлите его боту' },
+            { key: 'pay', title: 'Оплата поставщику', route: '/PayInvoice', permission: 'create', hint: 'По счёту или вручную' },
+            { key: 'self_card', title: 'Себе на карту', route: '/Payment/self_card', permission: 'create', hint: 'Только вручную' },
+            { key: 'between_accounts', title: 'Между своими счетами', route: '/Payment/between_accounts', permission: 'create', hint: 'Только вручную' },
+            { key: 'salary', title: 'Выплата зарплаты', route: '/Payment/salary', permission: 'create', hint: 'По ведомости или вручную' },
             { key: 'pending', title: 'Платежи на проверке', route: '/Requests?scope=active' },
             { key: 'history', title: 'История', route: '/Requests?scope=completed' },
         ],

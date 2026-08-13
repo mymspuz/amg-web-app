@@ -9,6 +9,7 @@ import RequestCard from "./components/RequestCard/RequestCard";
 import Section from "./components/Section/Section";
 import Requests from "./components/Requests/Requests";
 import PayInvoice from "./components/Payments/PayInvoice";
+import NewPayment from "./components/Payments/NewPayment";
 
 function App() {
   return (
@@ -22,6 +23,9 @@ function App() {
                 <Route path={'/Section/:key'} element={<Section />} />
                 <Route path={'/Requests'} element={<Requests />} />
                 <Route path={'/PayInvoice'} element={<PayInvoice />} />
+                {/* Вид операции берется из адреса: себе на карту, поставщику,
+                    между своими счетами, зарплата */}
+                <Route path={'/Payment/:kind'} element={<NewPayment />} />
             </Routes>
         </HashRouter>
     </div>
