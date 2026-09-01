@@ -1,0 +1,91 @@
+/* Раздел «Налоги и отчётность». Строка обязательства не кнопка, как в
+   остальных списках: внутри нее свои действия - оплатить и согласовать */
+
+.tax-profile {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e3e6ea);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.tax-profile .tax-regime {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.tax-stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tax-stats .tax-stat {
+    flex: 1;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e3e6ea);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+}
+
+.tax-stats .tax-stat b {
+    display: block;
+    font-size: 17px;
+}
+
+.tax-stats .tax-stat.warn b {
+    color: #d32f2f;
+}
+
+.tax-item {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e3e6ea);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.tax-item.overdue {
+    border-color: #d32f2f;
+}
+
+.tax-item .tax-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.tax-item .tax-title {
+    font-weight: 600;
+}
+
+.tax-item .tax-line {
+    color: #6b7280;
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+.tax-item .tax-amount {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.tax-item .tax-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.tax-item .tax-actions .btn {
+    margin: 0;
+}
+
+.tax-item .tax-data {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    color: #6b7280;
+    font-size: 13px;
+}

@@ -307,3 +307,111 @@ export const uploadInvoice = async (file: File, organizationId: number): Promise
         throw new Error(errorText(error))
     }
 }
+
+// --- Налоги и отчетность, раздел 3.5 ТЗ ---
+
+export type TTaxRegime = 'osno' | 'usn_income' | 'usn_income_expenses' | 'ausn' | 'psn' | 'eshn' | 'npd'
+
+// Профиль налогоплательщика: от него зависит весь календарь обязательств,
+// поэтому показываем его в шапке раздела
+export interface ITaxProfile {
+    regime: TTaxRegime
+    regimeTitle: string
+    form: 'ip' | 'ooo'
+    formTitle: string
+    taxRate: number | null
+    vat: boolean
+    hasEmployees: boolean
+    employeesCount: number | null
+    fixedContributions: boolean
+    extraTaxes: string[]
+    summary: string
+    comment: string | null
+}
+
+export interface ITaxObligation {
+    id: number
+    // payment - деньги в бюджет, report - отчет
+    kind: 'payment' | 'report'
+    title: string
+    period: string
+    periodName: string | null
+    dueOn: string
+    dueTitle: string
+    daysLeft: number
+    overdue: boolean
+    // Пусто, пока налог не рассчитан бухгалтером или 1С
+    amount: number | null
+    amountSource: string | null
+    status: string
+    statusTitle: string
+    kbk: string | null
+    purpose: string | null
+    receipt: string | null
+    comment: string | null
+    canPay: boolean
+    canApprove: boolean
+    note: string | null
+    dataItems: string[]
+}
+
+export interface ITaxState {
+    status: boolean
+    profile: ITaxProfile | null
+    message?: string
+    note: string | null
+    stats: {
+        to_pay_count: number
+        to_pay_amount: string
+        overdue_count: number
+        upcoming_count: number
+    } | null
+    obligations: ITaxObligation[]
+}
+
+export type TTaxScope = 'upcoming' | 'to_pay' | 'reports' | 'overdue' | 'all'
+
+export const fetchTaxState = async (organizationId: number): Promise<ITaxState> => {
+    const { data } = await api.get<ITaxState>('/taxes', { params: { organizationId } })
+
+    return data
+}
+
+export const fetchTaxObligations = async (
+    organizationId: number,
+    scope: TTaxScope
+): Promise<ITaxObligation[]> => {
+    const { data } = await api.get<{ status: boolean, items: ITaxObligation[] }>('/taxes/obligations', {
+        params: { organizationId, scope },
+    })
+
+    return data.items
+}
+
+// Кнопка «Оплатить налог»: возвращает uuid заявки - дальше открывается
+// та же карточка подтверждения, что и у остальных платежей
+export const payTax = async (
+    obligationId: number,
+    organizationId: number,
+    fromAccount?: string
+): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, uuid: string }>(
+            `/taxes/${obligationId}/pay`,
+            { organizationId, fromAccount }
+        )
+
+        return data.uuid
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+// Ответ на уведомление «требуется согласование»
+export const approveTax = async (obligationId: number, organizationId: number): Promise<void> => {
+    try {
+        await api.post(`/taxes/${obligationId}/approve`, { organizationId })
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}

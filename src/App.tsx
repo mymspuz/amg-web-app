@@ -10,6 +10,7 @@ import Section from "./components/Section/Section";
 import Requests from "./components/Requests/Requests";
 import PayInvoice from "./components/Payments/PayInvoice";
 import NewPayment from "./components/Payments/NewPayment";
+import Taxes from "./components/Taxes/Taxes";
 
 function App() {
   return (
@@ -26,6 +27,9 @@ function App() {
                 {/* Вид операции берется из адреса: себе на карту, поставщику,
                     между своими счетами, зарплата */}
                 <Route path={'/Payment/:kind'} element={<NewPayment />} />
+                {/* Раздел «Налоги и отчётность»: набор обязательств зависит
+                    от налогового профиля организации */}
+                <Route path={'/Taxes'} element={<Taxes />} />
             </Routes>
         </HashRouter>
     </div>

@@ -75,9 +75,10 @@ export const MENU: IMenuSection[] = [
         color: '#ff9b00',
         hint: 'Сроки и суммы',
         items: [
-            { key: 'to-pay', title: 'К оплате' },
-            { key: 'deadlines', title: 'Сроки' },
-            { key: 'reports', title: 'Сданные отчёты' },
+            { key: 'to-pay', title: 'К оплате', route: '/Taxes?scope=to_pay', hint: 'Рассчитанные налоги и кнопка оплаты' },
+            { key: 'deadlines', title: 'Сроки', route: '/Taxes?scope=upcoming', hint: 'Календарь по вашей системе налогообложения' },
+            { key: 'reports', title: 'Сданные отчёты', route: '/Taxes?scope=reports', hint: 'Квитанции и протоколы' },
+            // Справку готовит бухгалтер - это заявка из раздела «Задачи бухгалтерии»
             { key: 'certificate', title: 'Запрос справки' },
         ],
     },
