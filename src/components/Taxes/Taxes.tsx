@@ -33,7 +33,7 @@ const Taxes = () => {
     const navigate = useNavigate()
     const [search] = useSearchParams()
     const scope = (search.get('scope') || 'upcoming') as TTaxScope
-    const { organization, can } = useAppState()
+    const { organization, can, loading: stateLoading, error: stateError } = useAppState()
 
     const [state, setState] = useState<ITaxState | null>(null)
     const [items, setItems] = useState<ITaxObligation[]>([])
@@ -42,7 +42,16 @@ const Taxes = () => {
     const [busyId, setBusyId] = useState<number | null>(null)
 
     const load = useCallback(() => {
-        if (!organization) return
+        // Состояние еще едет - ждем: организация появится вместе с ним
+        if (stateLoading) return
+
+        // Организации нет и уже не будет: без нее раздел показывать нечего,
+        // но и висеть в «Загрузка...» нельзя - человек решит, что все сломалось
+        if (!organization) {
+            setLoading(false)
+
+            return
+        }
 
         setLoading(true)
         Promise.all([
@@ -56,7 +65,7 @@ const Taxes = () => {
             })
             .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить налоговые данные'))
             .finally(() => setLoading(false))
-    }, [organization, scope])
+    }, [organization, scope, stateLoading])
 
     useEffect(() => load(), [load])
 
@@ -113,8 +122,17 @@ const Taxes = () => {
                 {organization && <span className="muted">{organization.name}</span>}
             </div>
 
-            {loading && <p className="muted">Загрузка...</p>}
+            {(loading || stateLoading) && <p className="muted">Загрузка...</p>}
             {error && <div className="notice error">{error}</div>}
+            {stateError && <div className="notice error">{stateError}</div>}
+
+            {/* Организация не выбралась: чаще всего доступ к ней не выдан */}
+            {!stateLoading && !stateError && !organization && (
+                <div className="notice">
+                    Организация не выбрана. Вернитесь в меню и выберите компанию,
+                    а если списка нет - обратитесь в АМГ за доступом.
+                </div>
+            )}
 
             {/* Система налогообложения: по ней и построен весь список ниже */}
             {state?.profile && (
