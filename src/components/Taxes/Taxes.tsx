@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import '../../theme/theme1c.css'
 import './Taxes.css'
@@ -32,7 +32,10 @@ const money = (amount: number | null): string =>
 const Taxes = () => {
     const navigate = useNavigate()
     const [search] = useSearchParams()
-    const scope = (search.get('scope') || 'upcoming') as TTaxScope
+    const params = useParams<{ scope: string }>()
+    // Из ссылки бота вид списка приходит путем: хеш там занят телеграмом.
+    // Запрос оставлен для переходов внутри приложения
+    const scope = (params.scope || search.get('scope') || 'upcoming') as TTaxScope
     const { organization, can, loading: stateLoading, error: stateError } = useAppState()
 
     const [state, setState] = useState<ITaxState | null>(null)
