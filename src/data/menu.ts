@@ -109,6 +109,17 @@ export const MENU: IMenuSection[] = [
         ],
     },
     {
+        key: 'consultations',
+        title: 'Консультации',
+        icon: '📅',
+        color: '#00acc1',
+        hint: 'Запись к специалисту АМГ',
+        items: [
+            { key: 'book', title: 'Записаться', route: '/Consultation', hint: 'Тема, специалист и свободное время' },
+            { key: 'my', title: 'Мои записи', route: '/MyBookings', hint: 'Перенос и отмена' },
+        ],
+    },
+    {
         key: 'tasks',
         title: 'Задачи бухгалтерии',
         icon: '💬',

@@ -13,6 +13,8 @@ import NewPayment from "./components/Payments/NewPayment";
 import Taxes from "./components/Taxes/Taxes";
 import Reconciliation from "./components/Reconciliation/Reconciliation";
 import Tasks from "./components/Tasks/Tasks";
+import Consultation from "./components/Consultation/Consultation";
+import MyBookings from "./components/Consultation/MyBookings";
 
 function App() {
   return (
@@ -37,6 +39,9 @@ function App() {
                 {/* Сверки: акт с контрагентом и отчеты по счетам учета */}
                 <Route path={'/Reconciliation/:mode'} element={<Reconciliation />} />
                 <Route path={'/Tasks'} element={<Tasks />} />
+                {/* Запись на консультацию: тема, специалист, свободные слоты */}
+                <Route path={'/Consultation'} element={<Consultation />} />
+                <Route path={'/MyBookings'} element={<MyBookings />} />
             </Routes>
         </HashRouter>
     </div>

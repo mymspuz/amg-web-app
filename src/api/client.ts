@@ -517,3 +517,133 @@ export const fetchAccountingTasks = async (scope: 'open' | 'closed' | 'all' = 'o
 
     return data.items
 }
+
+// --- Запись на консультацию, раздел 3.8 ТЗ ---
+
+export interface ISpecialistOption {
+    id: number
+    name: string
+    position: string | null
+}
+
+export interface IConsultationTopic {
+    id: number
+    code: string
+    title: string
+    hint: string | null
+    durationMin: number
+    // Пусто - консультация бесплатная
+    price: number | null
+    // Разрешен ли выбор специалиста: по узким темам его подбирают за клиента
+    allowChoice: boolean
+    specialists: ISpecialistOption[]
+}
+
+export interface IBookingRules {
+    changeHours: number
+    leadMinutes: number
+    paymentHoldHours: number
+}
+
+export interface IConsultationDay {
+    date: string
+    title: string
+    count: number
+}
+
+export interface IConsultationSlot {
+    start: string
+    time: string
+    end: string
+    specialistId: number
+    specialistName: string
+}
+
+export interface IBooking {
+    id: number
+    topic: string
+    specialist: string
+    startsAt: string
+    when: string
+    endTime: string
+    status: string
+    statusTitle: string
+    price: number | null
+    paid: boolean
+    paymentLink: string | null
+    question: string | null
+    cancelReason: string | null
+    // Правила АМГ: менять запись можно не позже чем за N часов до начала
+    canChange: boolean
+}
+
+export const fetchConsultationTopics = async (): Promise<{ topics: IConsultationTopic[], rules: IBookingRules }> => {
+    const { data } = await api.get<{ status: boolean, topics: IConsultationTopic[], rules: IBookingRules }>(
+        '/consultations/topics'
+    )
+
+    return { topics: data.topics, rules: data.rules }
+}
+
+// Дни, где есть хотя бы одно свободное окно
+export const fetchConsultationDays = async (topicId: number, specialistId?: number): Promise<IConsultationDay[]> => {
+    const { data } = await api.get<{ status: boolean, days: IConsultationDay[] }>('/consultations/days', {
+        params: { topicId, specialistId },
+    })
+
+    return data.days
+}
+
+export const fetchConsultationSlots = async (
+    topicId: number,
+    date: string,
+    specialistId?: number
+): Promise<IConsultationSlot[]> => {
+    const { data } = await api.get<{ status: boolean, slots: IConsultationSlot[] }>('/consultations/slots', {
+        params: { topicId, date, specialistId },
+    })
+
+    return data.slots
+}
+
+export const createBooking = async (input: {
+    organizationId: number
+    topicId: number
+    specialistId?: number
+    start: string
+    question?: string
+}): Promise<{ id: number, when: string, specialist: string, awaitingPayment: boolean }> => {
+    try {
+        const { data } = await api.post<{
+            status: boolean, id: number, when: string, specialist: string, awaitingPayment: boolean
+        }>('/consultations', input)
+
+        return data
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchBookings = async (scope: 'upcoming' | 'past' | 'all' = 'upcoming'): Promise<IBooking[]> => {
+    const { data } = await api.get<{ status: boolean, items: IBooking[] }>('/consultations/my', { params: { scope } })
+
+    return data.items
+}
+
+export const cancelBooking = async (id: number, reason?: string): Promise<void> => {
+    try {
+        await api.post(`/consultations/${id}/cancel`, { reason })
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const moveBooking = async (id: number, start: string): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, when: string }>(`/consultations/${id}/move`, { start })
+
+        return data.when
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
