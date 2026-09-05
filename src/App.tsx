@@ -11,6 +11,8 @@ import Requests from "./components/Requests/Requests";
 import PayInvoice from "./components/Payments/PayInvoice";
 import NewPayment from "./components/Payments/NewPayment";
 import Taxes from "./components/Taxes/Taxes";
+import Reconciliation from "./components/Reconciliation/Reconciliation";
+import Tasks from "./components/Tasks/Tasks";
 
 function App() {
   return (
@@ -32,6 +34,9 @@ function App() {
                     а не запросом: в ссылке из бота хеш занимает телеграм */}
                 <Route path={'/Taxes'} element={<Taxes />} />
                 <Route path={'/Taxes/:scope'} element={<Taxes />} />
+                {/* Сверки: акт с контрагентом и отчеты по счетам учета */}
+                <Route path={'/Reconciliation/:mode'} element={<Reconciliation />} />
+                <Route path={'/Tasks'} element={<Tasks />} />
             </Routes>
         </HashRouter>
     </div>

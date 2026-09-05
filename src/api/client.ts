@@ -264,6 +264,8 @@ export interface IRequestListItem {
     type: string
     status: string
     statusTitle: string
+    // Заголовок заявки: платеж, акт сверки или отчет
+    title?: string | null
     sum: number | null
     supplierINN: string | null
     doc: string | null
@@ -414,4 +416,104 @@ export const approveTax = async (obligationId: number, organizationId: number): 
     } catch (error) {
         throw new Error(errorText(error))
     }
+}
+
+// --- Сверки и взаиморасчеты, раздел 3.7 ТЗ ---
+
+export interface IReportOption {
+    key: 'turnover' | 'card'
+    title: string
+    hint: string
+    requiresAccount: boolean
+}
+
+export interface IAccountOption {
+    code: string
+    title: string
+}
+
+export interface IReportOptions {
+    reports: IReportOption[]
+    // Счета, которые организации разрешено запрашивать
+    accounts: IAccountOption[]
+    restricted: boolean
+}
+
+export const fetchReportOptions = async (organizationId: number): Promise<IReportOptions> => {
+    const { data } = await api.get<{ status: boolean } & IReportOptions>('/reports/options', {
+        params: { organizationId },
+    })
+
+    return { reports: data.reports, accounts: data.accounts, restricted: data.restricted }
+}
+
+// Акт сверки формирует 1С, PDF придет в чат
+export const requestReconciliation = async (input: {
+    organizationId: number
+    counterpartyId: number
+    from: string
+    to: string
+    comment?: string
+}): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, title: string }>('/reconciliation', input)
+
+        return data.title
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const requestAccountReport = async (input: {
+    organizationId: number
+    report: string
+    account?: string
+    counterpartyId?: number
+    from: string
+    to: string
+}): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, title: string }>('/reports/account', input)
+
+        return data.title
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export interface IAccountingTask {
+    id: number
+    kind: string
+    kindTitle: string
+    subject: string
+    body: string | null
+    amount: number | null
+    status: string
+    statusTitle: string
+    answer: string | null
+    organizationId: number
+    createdAt: string
+}
+
+// Расхождения по сверке уходят задачей бухгалтеру, а не сообщением в чат
+export const createAccountingTask = async (input: {
+    organizationId: number
+    subject: string
+    body?: string
+    amount?: string
+    uuid?: string
+}): Promise<number> => {
+    try {
+        const { data } = await api.post<{ status: boolean, id: number }>('/tasks', input)
+
+        return data.id
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchAccountingTasks = async (scope: 'open' | 'closed' | 'all' = 'open'): Promise<IAccountingTask[]> => {
+    const { data } = await api.get<{ status: boolean, items: IAccountingTask[] }>('/tasks', { params: { scope } })
+
+    return data.items
 }

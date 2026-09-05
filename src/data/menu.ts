@@ -83,6 +83,18 @@ export const MENU: IMenuSection[] = [
         ],
     },
     {
+        key: 'reconciliation',
+        title: 'Сверки и взаиморасчёты',
+        icon: '🔄',
+        color: '#3f51b5',
+        hint: 'Акты сверки и отчёты из 1С',
+        items: [
+            { key: 'act', title: 'Акт сверки', route: '/Reconciliation/act', hint: 'С контрагентом за период' },
+            { key: 'report', title: 'Оборотка и карточка счёта', route: '/Reconciliation/report', hint: 'В рамках разрешённых счетов' },
+            { key: 'disputes', title: 'Мои обращения', route: '/Tasks', hint: 'Расхождения и вопросы бухгалтеру' },
+        ],
+    },
+    {
         key: 'staff',
         title: 'Зарплата и кадры',
         icon: '👥',
