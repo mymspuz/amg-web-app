@@ -647,3 +647,222 @@ export const moveBooking = async (id: number, start: string): Promise<string> =>
         throw new Error(errorText(error))
     }
 }
+
+// --- Административная панель, раздел 13 ТЗ ---
+
+export interface IAdminOverview {
+    bases: number
+    bases_online: number
+    organizations: number
+    users_active: number
+    users_pending: number
+    requests_today: number
+    errors_open: number
+    tasks_open: number
+    bookings_upcoming: number
+}
+
+export interface IAdminBase {
+    id: number
+    name: string
+    isActive: boolean
+    online: boolean
+    lastSeenAt: string | null
+    organizations: number
+    counterparties: number
+    accounts: number
+    // Что уже приехало из базы: видно, на каком шаге остановилось подключение
+    synced: {
+        organizations: string | null
+        counterparties: string | null
+        taxProfiles: string | null
+    }
+}
+
+export interface IAdminOrganization {
+    id: number
+    name: string
+    inn: string
+    kpp: string | null
+    base_id: number | null
+    base_name: string | null
+    is_active: boolean
+    payment_limit: number | null
+    reportAccounts: string[]
+    reportAccountsCustom: boolean
+    users_count: number
+    tax_regime: string | null
+    synced_at: string | null
+}
+
+export interface IAdminUser {
+    id: number
+    telegram_id: number
+    username: string | null
+    first_name: string | null
+    last_name: string | null
+    phone: string | null
+    global_role: string
+    status: string
+    organizations: { id: number, name: string, permissions: string[], isDefault: boolean }[]
+}
+
+export interface IAdminQueueItem {
+    uuid: string
+    type: string
+    status: string
+    attempts: number
+    last_error: string | null
+    created_at: string
+    title: string | null
+    sum: string | null
+    organization_name: string | null
+    base_name: string | null
+    username: string | null
+    first_name: string | null
+}
+
+export interface IAdminStats {
+    period_days: number
+    by_type: { type: string, total: number, done: number, failed: number }[]
+    avg_minutes: number | null
+    active_users: number
+    top_actions: { action: string, total: number }[]
+}
+
+export const fetchAdminOverview = async (): Promise<IAdminOverview> => {
+    const { data } = await api.get<{ status: boolean, overview: IAdminOverview }>('/admin/overview')
+
+    return data.overview
+}
+
+export const fetchAdminBases = async (): Promise<IAdminBase[]> => {
+    const { data } = await api.get<{ status: boolean, items: IAdminBase[] }>('/admin/bases')
+
+    return data.items
+}
+
+// Токен новой базы показывается один раз: дальше только перевыпуск
+export const createAdminBase = async (name: string, adopt = false): Promise<{ token: string, instruction: string[] }> => {
+    try {
+        const { data } = await api.post<{ status: boolean, token: string, instruction: string[] }>(
+            '/admin/bases', { name, adopt }
+        )
+
+        return { token: data.token, instruction: data.instruction }
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const rotateAdminBaseToken = async (id: number): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, token: string }>(`/admin/bases/${id}/token`, {})
+
+        return data.token
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const syncAdminBase = async (id: number, kind = 'all'): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, msg: string }>(`/admin/bases/${id}/sync`, { kind })
+
+        return data.msg
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchAdminOrganizations = async (baseId?: number): Promise<IAdminOrganization[]> => {
+    const { data } = await api.get<{ status: boolean, items: IAdminOrganization[] }>('/admin/organizations', {
+        params: { baseId },
+    })
+
+    return data.items
+}
+
+export const updateAdminOrganization = async (
+    id: number,
+    patch: { paymentLimit?: number | null, reportAccounts?: string[] | null, isActive?: boolean }
+): Promise<void> => {
+    try {
+        await api.patch(`/admin/organizations/${id}`, patch)
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchAdminUsers = async (search?: string): Promise<{ items: IAdminUser[], roles: string[], permissions: string[] }> => {
+    const { data } = await api.get<{ status: boolean, items: IAdminUser[], roles: string[], permissions: string[] }>(
+        '/admin/users', { params: { search: search || undefined } }
+    )
+
+    return { items: data.items, roles: data.roles, permissions: data.permissions }
+}
+
+export const updateAdminUser = async (id: number, patch: { role?: string, status?: string }): Promise<void> => {
+    try {
+        await api.patch(`/admin/users/${id}`, patch)
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const grantAdminAccess = async (
+    userId: number,
+    organizationId: number,
+    permissions: string[]
+): Promise<void> => {
+    try {
+        await api.post(`/admin/users/${userId}/grant`, { organizationId, permissions })
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const revokeAdminAccess = async (userId: number, organizationId: number): Promise<void> => {
+    try {
+        await api.post(`/admin/users/${userId}/revoke`, { organizationId })
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const createAdminInvite = async (input: {
+    organizationId?: number
+    role?: string
+    permissions?: string[]
+    days?: number
+}): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, link: string }>('/admin/invites', input)
+
+        return data.link
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchAdminQueue = async (scope: 'errors' | 'active' | 'recent'): Promise<IAdminQueueItem[]> => {
+    const { data } = await api.get<{ status: boolean, items: IAdminQueueItem[] }>('/admin/queue', { params: { scope } })
+
+    return data.items
+}
+
+export const retryAdminRequest = async (uuid: string): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, msg: string }>(`/admin/queue/${uuid}/retry`, {})
+
+        return data.msg
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
+export const fetchAdminStats = async (days = 30): Promise<IAdminStats> => {
+    const { data } = await api.get<{ status: boolean, stats: IAdminStats }>('/admin/stats', { params: { days } })
+
+    return data.stats
+}

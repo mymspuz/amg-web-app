@@ -5,7 +5,7 @@ import '../../theme/theme1c.css'
 
 import { acceptConsent } from '../../api/client'
 import ConnectionStatus from '../ConnectionStatus/ConnectionStatus'
-import { MENU } from '../../data/menu'
+import { menuFor } from '../../data/menu'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
@@ -119,7 +119,7 @@ const MainMenu = () => {
             </div>
 
             <div className="tiles">
-                {MENU.map(section => (
+                {menuFor(state.user.role).map(section => (
                     <button
                         key={section.key}
                         className="tile"

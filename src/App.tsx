@@ -15,6 +15,7 @@ import Reconciliation from "./components/Reconciliation/Reconciliation";
 import Tasks from "./components/Tasks/Tasks";
 import Consultation from "./components/Consultation/Consultation";
 import MyBookings from "./components/Consultation/MyBookings";
+import Admin from "./components/Admin/Admin";
 
 function App() {
   return (
@@ -42,6 +43,8 @@ function App() {
                 {/* Запись на консультацию: тема, специалист, свободные слоты */}
                 <Route path={'/Consultation'} element={<Consultation />} />
                 <Route path={'/MyBookings'} element={<MyBookings />} />
+                {/* Административная панель: вкладка идет путем */}
+                <Route path={'/Admin/:tab'} element={<Admin />} />
             </Routes>
         </HashRouter>
     </div>

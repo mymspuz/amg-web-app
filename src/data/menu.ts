@@ -18,6 +18,8 @@ export interface IMenuSection {
     icon: string
     color: string
     hint: string
+    // Раздел виден только сотрудникам АМГ: клиенту его не показываем вовсе
+    staffOnly?: boolean
     items: IMenuItem[]
 }
 
@@ -146,6 +148,21 @@ export const MENU: IMenuSection[] = [
         ],
     },
     {
+        key: 'admin',
+        title: 'Администрирование',
+        icon: '🛠',
+        color: '#455a64',
+        hint: 'Базы, доступы, очередь',
+        staffOnly: true,
+        items: [
+            { key: 'bases', title: 'Базы 1С', route: '/Admin/bases', hint: 'Подключение и выгрузка справочников' },
+            { key: 'orgs', title: 'Организации', route: '/Admin/orgs', hint: 'Лимиты и доступные счета' },
+            { key: 'users', title: 'Пользователи', route: '/Admin/users', hint: 'Роли, доступы, приглашения' },
+            { key: 'queue', title: 'Очередь и ошибки', route: '/Admin/queue', hint: 'Перезапуск заявок' },
+            { key: 'stats', title: 'Статистика', route: '/Admin/stats', hint: 'Операции и активность' },
+        ],
+    },
+    {
         key: 'help',
         title: 'Помощь',
         icon: '❓',
@@ -160,3 +177,7 @@ export const MENU: IMenuSection[] = [
 ]
 
 export const findSection = (key: string): IMenuSection | undefined => MENU.find(s => s.key === key)
+
+// Разделы, доступные роли: административный виден только сотрудникам АМГ
+export const menuFor = (role?: string): IMenuSection[] =>
+    MENU.filter(section => !section.staffOnly || role === 'admin' || role === 'head')

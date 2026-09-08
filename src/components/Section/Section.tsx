@@ -13,7 +13,11 @@ const Section = () => {
     const navigate = useNavigate()
     const { state, can, loading } = useAppState()
 
-    const section = findSection(key || '')
+    const found = findSection(key || '')
+    const role = state?.user.role
+    // Служебный раздел закрыт и по прямой ссылке: права проверяет сервер,
+    // но показывать клиенту чужие пункты незачем
+    const section = found && found.staffOnly && role !== 'admin' && role !== 'head' ? undefined : found
 
     if (!section) {
         return (
