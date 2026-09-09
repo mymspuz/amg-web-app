@@ -74,6 +74,8 @@ export interface IChatState {
 
 export interface IInvoiceRequest {
     organizationId: number
+    // Расчетный счет поставщика: его реквизиты попадут в шапку счета
+    account?: string
     // Контрагент из базы 1С. Ноль - покупателя вводят вручную
     counterpartyId: number
     fromFile: boolean

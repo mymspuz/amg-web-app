@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import '../../theme/forms1c.css'
 import '../InvoiceForPayment/InvoiceForPayment.css'
@@ -54,6 +54,9 @@ const KINDS: Record<TPaymentKind, IKindInfo> = {
 const NewPayment = () => {
     const navigate = useNavigate()
     const { kind } = useParams<{ kind: TPaymentKind }>()
+    // Организация и счет могли быть выбраны на прошлом шаге - продолжаем
+    // сценарий, а не начинаем его заново
+    const [search] = useSearchParams()
     const { onClose, showMainButton, hasMainButton } = useTelegram()
     const { organization } = useAppState()
     const fileInput = useRef<HTMLInputElement>(null)
@@ -84,15 +87,25 @@ const NewPayment = () => {
         fetchOrganizations()
             .then((list) => {
                 setOrganizations(list)
-                const preferred = list.find(o => o.id === organization?.id) || list.find(o => o.isDefault) || list[0]
+                const fromUrl = Number(search.get('org')) || 0
+                const preferred = list.find(o => o.id === fromUrl)
+                    || list.find(o => o.id === organization?.id)
+                    || list.find(o => o.isDefault)
+                    || list[0]
+
                 if (preferred) {
                     setOrganizationId(preferred.id)
-                    // Счет списания по умолчанию - основной счет организации
-                    setForm(f => ({ ...f, fromAccount: preferred.accounts[0]?.account || '' }))
+                    // Счет списания: выбранный на прошлом шаге или основной
+                    const chosen = search.get('account')
+                    const known = chosen && preferred.accounts.some(a => a.account === chosen)
+                    setForm(f => ({
+                        ...f,
+                        fromAccount: known ? (chosen as string) : (preferred.accounts[0]?.account || ''),
+                    }))
                 }
             })
             .catch(e => setError(e instanceof Error ? e.message : String(e)))
-    }, [organization])
+    }, [organization, search])
 
     const onSend = useCallback(async () => {
         if (!kind || !organizationId) return setError('Не выбрана организация')
@@ -134,7 +147,7 @@ const NewPayment = () => {
             <div className="form-container">
                 <div className="adaptive-form">
                     <div className="error-message">Неизвестный вид платежа</div>
-                    <button className="main-action-button" onClick={() => navigate('/Section/payments')}>К платежам</button>
+                    <button className="main-action-button" onClick={() => navigate(-1)}>Назад</button>
                 </div>
             </div>
         )
@@ -146,7 +159,7 @@ const NewPayment = () => {
     return (
         <div className="form-container">
             <div className="form-header">
-                <button type="button" className="back-button" onClick={() => navigate('/Section/payments')} aria-label="Назад">‹</button>
+                <button type="button" className="back-button" onClick={() => navigate(-1)} aria-label="Назад">‹</button>
                 <h1>{info.icon} {info.title}</h1>
                 <p>{info.hint}</p>
             </div>

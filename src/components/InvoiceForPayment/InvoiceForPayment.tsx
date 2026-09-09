@@ -23,6 +23,18 @@ interface IItem {
     unit: string
 }
 
+// То, что человек набирает в полях. Количество и цена здесь строки:
+// пустое поле должно оставаться пустым, а не превращаться в ноль
+interface IItemInput {
+    id: number
+    name: string
+    amount: string
+    price: string
+    unit: string
+}
+
+const EMPTY_ITEM: IItemInput = { id: 0, name: '', price: '', amount: '1', unit: 'шт' }
+
 interface IFormData {
     // Основание печатается в шапке счета
     basis: string
@@ -83,11 +95,17 @@ const InvoiceForPayment = () => {
     })
 
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
-    const [newItem, setNewItem] = useState<IItem>({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
+    const [newItem, setNewItem] = useState<IItemInput>(EMPTY_ITEM)
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
 
     const supplier = organizations.find(o => o.id === supplierId) || null
-    const account = supplier?.accounts[0] || null
+    // Счет выбирает пользователь: у организации их бывает несколько,
+    // и покупатель должен платить именно на нужный
+    const [accountNumber, setAccountNumber] = useState<string>('')
+    const account = supplier?.accounts.find(a => a.account === accountNumber)
+        || supplier?.accounts.find(a => a.isDefault)
+        || supplier?.accounts[0]
+        || null
 
     useEffect(() => {
         fetchOrganizations()
@@ -95,7 +113,11 @@ const InvoiceForPayment = () => {
                 setOrganizations(list)
                 // Подставляем ту организацию, что выбрана в шапке приложения
                 const preferred = list.find(o => o.id === organization?.id) || list.find(o => o.isDefault) || list[0]
-                if (preferred) setSupplierId(preferred.id)
+                if (preferred) {
+                    setSupplierId(preferred.id)
+                    const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+                    setAccountNumber(first ? first.account : '')
+                }
             })
             .catch(e => setSendError(e instanceof Error ? e.message : String(e)))
     }, [organization])
@@ -111,8 +133,10 @@ const InvoiceForPayment = () => {
     }
 
     const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, name: e.target.value })
-    const handleItemAmountChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, amount: Number(e.target.value) })
-    const handleItemPriceChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, price: Number(e.target.value) })
+    // Храним ввод строкой: Number('') превращался в 0, поле само собой
+    // заполнялось нулем, и стереть его было невозможно
+    const handleItemAmountChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, amount: e.target.value })
+    const handleItemPriceChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, price: e.target.value })
 
     const handleBack = (): void => {
         navigate(-1)
@@ -120,7 +144,7 @@ const InvoiceForPayment = () => {
 
     const handleSelectedItem = (item: IItem) => {
         if (item.id === selectedItem.id) {
-            setSelectedItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
+            setSelectedItem({} as IItem)
         } else {
             setSelectedItem(item)
         }
@@ -128,18 +152,31 @@ const InvoiceForPayment = () => {
 
     const handleAddNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
+        const amount = Number(String(newItem.amount).replace(',', '.'))
+        const price = Number(String(newItem.price).replace(',', '.'))
+
+        if (!newItem.name.trim() || !(amount > 0) || !(price > 0)) {
+            setErrors(prev => ({ ...prev, items: 'Укажите наименование, количество и цену' }))
+
+            return
+        }
+
         const lastId = formData.items.length ? formData.items[formData.items.length - 1].id : 0
         const copyItems = [...formData.items]
-        copyItems.push({ id: lastId + 1, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price, unit: newItem.unit || 'шт' })
+        copyItems.push({ id: lastId + 1, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт' })
         setFormData({ ...formData, items: copyItems })
-        setNewItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
+        setErrors(prev => ({ ...prev, items: '' }))
+        setNewItem(EMPTY_ITEM)
     }
 
     const handleEditNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
+        const amount = Number(String(newItem.amount).replace(',', '.'))
+        const price = Number(String(newItem.price).replace(',', '.'))
+
         const copyItems = formData.items.map(i => (
             i.id === selectedItem.id
-                ? { ...i, name: newItem.name.trim(), amount: newItem.amount, price: newItem.price, unit: newItem.unit || 'шт' }
+                ? { ...i, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт' }
                 : i
         ))
         setFormData({ ...formData, items: copyItems })
@@ -148,7 +185,7 @@ const InvoiceForPayment = () => {
     const handleRemoveNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
         e.stopPropagation()
         setFormData({ ...formData, items: formData.items.filter(i => i.id !== selectedItem.id) })
-        setNewItem({ id: 0, name: '', price: 1, amount: 1, unit: 'шт' })
+        setNewItem(EMPTY_ITEM)
     }
 
     const handleTextInputChange = (
@@ -190,6 +227,7 @@ const InvoiceForPayment = () => {
         try {
             await sendInvoice({
                 organizationId: supplierId,
+                account: account ? account.account : undefined,
                 counterpartyId: buyer ? buyer.id : 0,
                 fromFile: formData.fromFile,
                 basis: formData.basis,
@@ -206,14 +244,25 @@ const InvoiceForPayment = () => {
             setSendError(e instanceof Error ? e.message : String(e))
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData, supplierId, buyer, manual])
+    }, [formData, supplierId, buyer, manual, account])
 
     useEffect(() => {
-        if (selectedItem.id !== undefined) setNewItem(selectedItem)
+        if (selectedItem.id === undefined) return
+
+        setNewItem({
+            id: selectedItem.id,
+            name: selectedItem.name,
+            unit: selectedItem.unit,
+            amount: String(selectedItem.amount ?? ''),
+            price: String(selectedItem.price ?? ''),
+        })
     }, [selectedItem])
 
     useEffect(() => {
-        if (newItem.amount <= 0 || newItem.price <= 0 || !newItem.name.trim().length) {
+        const amount = Number(String(newItem.amount).replace(',', '.'))
+        const price = Number(String(newItem.price).replace(',', '.'))
+
+        if (!(amount > 0) || !(price > 0) || !newItem.name.trim().length) {
             setPermittedOperations('none')
         } else {
             setPermittedOperations(newItem.id ? 'edit' : 'add')
@@ -256,7 +305,13 @@ const InvoiceForPayment = () => {
                         <select
                             id="supplier"
                             value={supplierId}
-                            onChange={(e) => setSupplierId(Number(e.target.value))}
+                            onChange={(e) => {
+                                const id = Number(e.target.value)
+                                setSupplierId(id)
+                                const next = organizations.find(o => o.id === id)
+                                const first = next?.accounts.find(a => a.isDefault) || next?.accounts[0]
+                                setAccountNumber(first ? first.account : '')
+                            }}
                         >
                             {!organizations.length && <option value={0}>Организации не загружены</option>}
                             {organizations.map(o => (
@@ -264,6 +319,32 @@ const InvoiceForPayment = () => {
                             ))}
                         </select>
                     </div>
+
+                    {/* Расчетный счет выбирает пользователь: на него покупатель
+                        и будет платить, и его реквизиты попадут в шапку счета */}
+                    {supplier && supplier.accounts.length > 0 && (
+                        <div className="input-group">
+                            <label htmlFor="supplierAccount" className="required">Расчётный счёт</label>
+                            <select
+                                id="supplierAccount"
+                                value={account ? account.account : ''}
+                                onChange={(e) => setAccountNumber(e.target.value)}
+                            >
+                                {supplier.accounts.map(a => (
+                                    <option key={a.account} value={a.account}>
+                                        {a.account}{a.bankName ? ` · ${a.bankName}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <span className="hint">На этот счёт покупатель перечислит оплату</span>
+                        </div>
+                    )}
+
+                    {supplier && !supplier.accounts.length && (
+                        <div className="error-message">
+                            У организации нет расчётного счёта в 1С — счёт выставить не с чего
+                        </div>
+                    )}
 
                     {/* Показываем реквизиты, которые уйдут в счет: их правка -
                         в 1С, поэтому здесь они только для проверки */}
