@@ -76,6 +76,8 @@ export interface IInvoiceRequest {
     organizationId: number
     // Расчетный счет поставщика: его реквизиты попадут в шапку счета
     account?: string
+    // Договор с покупателем: его представление станет основанием счета
+    contractId?: number
     // Контрагент из базы 1С. Ноль - покупателя вводят вручную
     counterpartyId: number
     fromFile: boolean
@@ -867,4 +869,41 @@ export const fetchAdminStats = async (days = 30): Promise<IAdminStats> => {
     const { data } = await api.get<{ status: boolean, stats: IAdminStats }>('/admin/stats', { params: { days } })
 
     return data.stats
+}
+
+// --- Договоры контрагентов ---
+
+export interface IContract {
+    id: number
+    title: string
+    number: string | null
+    date: string | null
+    kind: string | null
+    // Основной договор подставляется в счет по умолчанию
+    isMain: boolean
+}
+
+export const fetchContracts = async (
+    counterpartyId: number,
+    organizationId: number
+): Promise<{ items: IContract[], complete: boolean }> => {
+    const { data } = await api.get<{ status: boolean, items: IContract[], complete: boolean }>('/contracts', {
+        params: { counterpartyId, organizationId },
+    })
+
+    return { items: data.items, complete: data.complete }
+}
+
+// Догрузка остальных договоров: 1С ответит следующим опросом очереди
+export const syncContracts = async (counterpartyId: number, organizationId: number): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, msg: string }>('/contracts/sync', {
+            counterpartyId,
+            organizationId,
+        })
+
+        return data.msg
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
 }

@@ -11,7 +11,10 @@ import {
     fetchOrganizations,
     ICounterparty,
     IOrganizationDetails,
+    fetchContracts,
+    IContract,
     sendInvoice,
+    syncContracts,
 } from '../../api/client'
 import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
 
@@ -94,6 +97,13 @@ const InvoiceForPayment = () => {
         fromFile: fromFile ? fromFile === '1' : false,
     })
 
+    // Договоры покупателя: основной приезжает вместе со справочниками,
+    // остальные догружаются по кнопке
+    const [contracts, setContracts] = useState<IContract[]>([])
+    const [contractId, setContractId] = useState<number>(0)
+    const [contractsComplete, setContractsComplete] = useState(true)
+    const [contractsNotice, setContractsNotice] = useState('')
+
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItemInput>(EMPTY_ITEM)
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
@@ -122,14 +132,48 @@ const InvoiceForPayment = () => {
             .catch(e => setSendError(e instanceof Error ? e.message : String(e)))
     }, [organization])
 
+    const loadContracts = useCallback(async (counterpartyId: number) => {
+        if (!counterpartyId || !supplierId) return
+
+        try {
+            const data = await fetchContracts(counterpartyId, supplierId)
+            setContracts(data.items)
+            setContractsComplete(data.complete)
+            // Основной договор подставляем сам: чаще всего нужен именно он
+            const main = data.items.find(c => c.isMain) || data.items[0]
+            setContractId(main ? main.id : 0)
+        } catch {
+            setContracts([])
+            setContractId(0)
+        }
+    }, [supplierId])
+
     const selectBuyer = (item: ICounterparty) => {
         setBuyer(item)
         setErrors(prev => ({ ...prev, buyer: '' }))
+        setContractsNotice('')
+        loadContracts(item.id)
+    }
+
+    // Догрузка остальных договоров: 1С отвечает следующим опросом,
+    // поэтому список перечитываем с задержкой
+    const requestContracts = async () => {
+        if (!buyer) return
+
+        try {
+            setContractsNotice(await syncContracts(buyer.id, supplierId))
+            window.setTimeout(() => loadContracts(buyer.id), 6000)
+        } catch (e) {
+            setContractsNotice(e instanceof Error ? e.message : String(e))
+        }
     }
 
     const resetBuyer = () => {
         setBuyer(null)
         setManual(false)
+        setContracts([])
+        setContractId(0)
+        setContractsNotice('')
     }
 
     const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, name: e.target.value })
@@ -228,6 +272,7 @@ const InvoiceForPayment = () => {
             await sendInvoice({
                 organizationId: supplierId,
                 account: account ? account.account : undefined,
+                contractId: contractId || undefined,
                 counterpartyId: buyer ? buyer.id : 0,
                 fromFile: formData.fromFile,
                 basis: formData.basis,
@@ -244,7 +289,7 @@ const InvoiceForPayment = () => {
             setSendError(e instanceof Error ? e.message : String(e))
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData, supplierId, buyer, manual, account])
+    }, [formData, supplierId, buyer, manual, account, contractId])
 
     useEffect(() => {
         if (selectedItem.id === undefined) return
@@ -476,19 +521,55 @@ const InvoiceForPayment = () => {
 
                 <fieldset className="form-section">
                     <legend>📑 Основание</legend>
-                    <div className="input-group">
-                        <label htmlFor="basis">Договор или основание поставки</label>
-                        <input
-                            id="basis"
-                            type="text"
-                            value={formData.basis}
-                            onChange={handleTextInputChange}
-                            placeholder="Основной договор 26/09 от 26.09.2022"
-                        />
-                        {/* В 1С это ссылка на договор, у нас - текст: договоров
-                            в справочниках бота нет, а строка печатается как есть */}
-                        <span className="muted">Если оставить пустым, в счете будет «Без договора»</span>
-                    </div>
+
+                    {/* Договор берем из 1С: основной подставляется сам,
+                        остальные догружаются по кнопке - их бывает много,
+                        а нужны они редко */}
+                    {buyer && contracts.length > 0 && (
+                        <div className="input-group">
+                            <label htmlFor="contract">Договор из 1С</label>
+                            <select
+                                id="contract"
+                                value={contractId}
+                                onChange={(e) => setContractId(Number(e.target.value))}
+                            >
+                                <option value={0}>Без договора</option>
+                                {contracts.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.title}{c.isMain ? ' · основной' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {buyer && !contractsComplete && (
+                        <div className="input-group">
+                            <button type="button" className="tg-button secondary" onClick={requestContracts}>
+                                {contracts.length ? 'Показать остальные договоры' : 'Запросить договоры из 1С'}
+                            </button>
+                            <span className="hint">
+                                Загружен только основной договор. Остальные запросим у 1С — это занимает несколько секунд
+                            </span>
+                        </div>
+                    )}
+
+                    {contractsNotice && <div className="notice">{contractsNotice}</div>}
+
+                    {/* Текстом основание задают, когда договора в 1С нет */}
+                    {!contractId && (
+                        <div className="input-group">
+                            <label htmlFor="basis">Или впишите основание вручную</label>
+                            <input
+                                id="basis"
+                                type="text"
+                                value={formData.basis}
+                                onChange={handleTextInputChange}
+                                placeholder="Счёт-оферта, разовая поставка"
+                            />
+                            <span className="muted">Если оставить пустым, в счете будет «Без договора»</span>
+                        </div>
+                    )}
                 </fieldset>
 
                 {!formData.fromFile &&
