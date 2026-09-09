@@ -907,3 +907,66 @@ export const syncContracts = async (counterpartyId: number, organizationId: numb
         throw new Error(errorText(error))
     }
 }
+
+// --- Заведение контрагента по ИНН ---
+
+export interface IFoundCounterparty {
+    id: number
+    name: string
+    inn: string | null
+    kpp: string | null
+    address: string | null
+    baseId: number
+    baseName: string
+    // Найден в базе, с которой сейчас работает пользователь
+    sameBase: boolean
+}
+
+export interface IExternalParty {
+    name: string
+    fullName?: string
+    inn: string
+    kpp?: string
+    ogrn?: string
+    address?: string
+    director?: string
+    status?: string
+    source: string
+}
+
+export interface ILookupResult {
+    inn: string
+    valid: boolean
+    error?: string
+    kind?: 'legal' | 'entrepreneur'
+    found: IFoundCounterparty[]
+    external?: IExternalParty | null
+    externalError?: string
+}
+
+// Поиск по ИНН: сначала свои базы, потом внешний источник реквизитов
+export const lookupCounterparty = async (inn: string, organizationId: number): Promise<ILookupResult> => {
+    const { data } = await api.get<{ status: boolean } & ILookupResult>('/counterparties/lookup', {
+        params: { inn, organizationId },
+    })
+
+    return data
+}
+
+// Заведение в 1С: контрагент появится в справочнике через несколько секунд
+export const createCounterparty = async (input: {
+    organizationId: number
+    inn: string
+    kpp?: string
+    name: string
+    fullName?: string
+    address?: string
+}): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, msg: string }>('/counterparties', input)
+
+        return data.msg
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}

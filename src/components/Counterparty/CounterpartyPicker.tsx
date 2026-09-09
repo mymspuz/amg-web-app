@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react'
 
-import { fetchCounterparties, ICounterparty } from '../../api/client'
+import {
+    createCounterparty,
+    fetchCounterparties,
+    ICounterparty,
+    ILookupResult,
+    lookupCounterparty,
+} from '../../api/client'
 
 interface IProps {
     organizationId?: number
@@ -19,6 +25,64 @@ const CounterpartyPicker = ({ organizationId, selected, onSelect, onClear, label
     const [query, setQuery] = useState('')
     const [found, setFound] = useState<ICounterparty[]>([])
     const [searching, setSearching] = useState(false)
+
+    // Заведение нового контрагента: по ИНН смотрим свои базы и внешний
+    // источник, дальше карточку заводит 1С
+    const [creating, setCreating] = useState(false)
+    const [inn, setInn] = useState('')
+    const [lookup, setLookup] = useState<ILookupResult | null>(null)
+    const [draft, setDraft] = useState({ name: '', kpp: '', address: '' })
+    const [busy, setBusy] = useState(false)
+    const [notice, setNotice] = useState('')
+    const [createError, setCreateError] = useState('')
+
+    const onLookup = async () => {
+        if (!organizationId) return
+
+        setBusy(true)
+        setCreateError('')
+        setNotice('')
+        try {
+            const result = await lookupCounterparty(inn, organizationId)
+            setLookup(result)
+
+            // Реквизиты из внешнего источника или из соседней базы:
+            // набирать руками ничего не придется
+            const known = result.external || result.found[0]
+            if (known) {
+                setDraft({
+                    name: known.name || '',
+                    kpp: known.kpp || '',
+                    address: (known as { address?: string | null }).address || '',
+                })
+            }
+        } catch (e) {
+            setCreateError(e instanceof Error ? e.message : 'Не удалось проверить ИНН')
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    const onCreate = async () => {
+        if (!organizationId) return
+
+        setBusy(true)
+        setCreateError('')
+        try {
+            setNotice(await createCounterparty({
+                organizationId,
+                inn,
+                kpp: draft.kpp,
+                name: draft.name,
+                address: draft.address,
+            }))
+            setLookup(null)
+        } catch (e) {
+            setCreateError(e instanceof Error ? e.message : String(e))
+        } finally {
+            setBusy(false)
+        }
+    }
 
     useEffect(() => {
         if (selected) return
@@ -75,7 +139,7 @@ const CounterpartyPicker = ({ organizationId, selected, onSelect, onClear, label
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Например, Техно или 7724727585"
+                    placeholder="Например, Техно или 7707083893"
                     autoComplete="off"
                     className={error ? 'error' : ''}
                 />
@@ -84,8 +148,119 @@ const CounterpartyPicker = ({ organizationId, selected, onSelect, onClear, label
 
             {searching && <p className="muted">Ищем...</p>}
 
-            {!searching && query.trim().length >= 2 && !found.length && (
-                <p className="muted">Ничего не нашлось. Проверьте написание.</p>
+            {!searching && query.trim().length >= 2 && !found.length && !creating && (
+                <>
+                    <p className="muted">Ничего не нашлось. Проверьте написание.</p>
+                    <button type="button" className="tg-button secondary" onClick={() => setCreating(true)}>
+                        Контрагента нет в 1С — завести по ИНН
+                    </button>
+                </>
+            )}
+
+            {creating && (
+                <div className="party-card">
+                    <div className="input-group">
+                        <label htmlFor="newInn" className="required">ИНН контрагента</label>
+                        <input
+                            id="newInn"
+                            type="text"
+                            inputMode="numeric"
+                            value={inn}
+                            onChange={(e) => setInn(e.target.value)}
+                            placeholder="10 цифр у организации, 12 у предпринимателя"
+                        />
+                    </div>
+
+                    {createError && <div className="error-message">{createError}</div>}
+                    {notice && <div className="notice">{notice}</div>}
+
+                    {!lookup && (
+                        <button type="button" className="tg-button primary" disabled={busy || !inn.trim()} onClick={onLookup}>
+                            {busy ? 'Проверяем...' : 'Проверить ИНН'}
+                        </button>
+                    )}
+
+                    {lookup && !lookup.valid && <div className="error-message">{lookup.error}</div>}
+
+                    {/* Контрагент уже заведен у соседнего клиента: реквизиты
+                        выверены бухгалтером, набирать заново незачем */}
+                    {lookup && lookup.found.map(item => (
+                        <div key={item.baseId + '-' + item.id} className="party-line muted">
+                            {item.sameBase
+                                ? 'Уже есть в вашей базе: ' + item.name
+                                : 'Есть в базе «' + item.baseName + '»: ' + item.name}
+                        </div>
+                    ))}
+
+                    {lookup && lookup.external && (
+                        <div className="party-line muted">
+                            Данные из реестра: {lookup.external.name}
+                            {lookup.external.status && lookup.external.status !== 'ACTIVE'
+                                ? ' · внимание: организация не действующая'
+                                : ''}
+                        </div>
+                    )}
+                    {lookup && lookup.externalError && (
+                        <div className="party-line muted">{lookup.externalError}</div>
+                    )}
+
+                    {lookup && lookup.valid && (
+                        <>
+                            <div className="input-group">
+                                <label htmlFor="newName" className="required">Наименование</label>
+                                <input
+                                    id="newName"
+                                    type="text"
+                                    value={draft.name}
+                                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                                    placeholder="ООО «Ромашка»"
+                                />
+                            </div>
+
+                            {lookup.kind === 'legal' && (
+                                <div className="input-group">
+                                    <label htmlFor="newKpp">КПП</label>
+                                    <input
+                                        id="newKpp"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={draft.kpp}
+                                        onChange={(e) => setDraft({ ...draft, kpp: e.target.value })}
+                                        placeholder="9 цифр"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="input-group">
+                                <label htmlFor="newAddress">Адрес</label>
+                                <input
+                                    id="newAddress"
+                                    type="text"
+                                    value={draft.address}
+                                    onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+                                    placeholder="Город, улица, дом"
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                className="tg-button primary"
+                                disabled={busy || !draft.name.trim()}
+                                onClick={onCreate}
+                            >
+                                {busy ? 'Отправляем в 1С...' : 'Завести контрагента'}
+                            </button>
+                        </>
+                    )}
+
+                    <button
+                        type="button"
+                        className="tg-button secondary"
+                        onClick={() => { setCreating(false); setLookup(null); setNotice(''); setCreateError('') }}
+                    >
+                        Отмена
+                    </button>
+                </div>
             )}
 
             {found.length > 0 && (

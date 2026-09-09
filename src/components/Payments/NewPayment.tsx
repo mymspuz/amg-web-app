@@ -226,7 +226,7 @@ const NewPayment = () => {
                                     inputMode="numeric"
                                     value={form.supplierINN}
                                     onChange={set('supplierINN')}
-                                    placeholder="7724727585"
+                                    placeholder="7707083893"
                                 />
                                 <span className="hint">Если контрагента еще нет в 1С, реквизиты проверит бухгалтер</span>
                             </div>
