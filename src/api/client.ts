@@ -985,3 +985,43 @@ export const counterpartyStatus = async (uuid: string): Promise<{
 
     return data
 }
+
+// --- Номенклатура для подсказок в счете ---
+
+export interface INomenclatureSuggestion {
+    id: number
+    name: string
+    unit: string | null
+    price: number | null
+    // Цена именно для этого покупателя, а не последняя вообще
+    priceForBuyer: boolean
+    usageCount: number
+}
+
+// Подсказки берутся из позиций, использованных за последние полгода:
+// частые - первыми
+export const fetchNomenclature = async (
+    organizationId: number,
+    search: string,
+    counterpartyId?: number
+): Promise<INomenclatureSuggestion[]> => {
+    const { data } = await api.get<{ status: boolean, items: INomenclatureSuggestion[] }>('/nomenclature', {
+        params: { organizationId, search, counterpartyId, limit: 15 },
+    })
+
+    return data.items
+}
+
+// Позиции нет среди использованных - просим 1С поискать по справочнику
+export const searchNomenclatureIn1C = async (organizationId: number, search: string): Promise<string> => {
+    try {
+        const { data } = await api.post<{ status: boolean, msg: string }>('/nomenclature/search', {
+            organizationId,
+            search,
+        })
+
+        return data.msg
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}

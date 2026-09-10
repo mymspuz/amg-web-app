@@ -12,7 +12,10 @@ import {
     ICounterparty,
     IOrganizationDetails,
     fetchContracts,
+    fetchNomenclature,
     IContract,
+    INomenclatureSuggestion,
+    searchNomenclatureIn1C,
     sendInvoice,
     syncContracts,
 } from '../../api/client'
@@ -104,6 +107,12 @@ const InvoiceForPayment = () => {
     const [contractsComplete, setContractsComplete] = useState(true)
     const [contractsNotice, setContractsNotice] = useState('')
 
+    // Подсказки номенклатуры: список собран из документов за полгода,
+    // поэтому ходовые услуги оказываются вверху
+    const [hints, setHints] = useState<INomenclatureSuggestion[]>([])
+    const [hintsOpen, setHintsOpen] = useState(false)
+    const [hintNotice, setHintNotice] = useState('')
+
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItemInput>(EMPTY_ITEM)
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
@@ -176,7 +185,33 @@ const InvoiceForPayment = () => {
         setContractsNotice('')
     }
 
-    const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, name: e.target.value })
+    const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => {
+        setNewItem({ ...newItem, name: e.target.value })
+        setHintsOpen(true)
+        setHintNotice('')
+    }
+
+    // Подсказку выбрали: единица и цена приезжают из 1С, набирать их не нужно
+    const applyHint = (hint: INomenclatureSuggestion) => {
+        setNewItem({
+            ...newItem,
+            name: hint.name,
+            unit: hint.unit || 'шт',
+            price: hint.price === null ? newItem.price : String(hint.price),
+        })
+        setHintsOpen(false)
+    }
+
+    // Позиции нет среди использованных - просим 1С поискать по справочнику
+    const askOneC = async () => {
+        try {
+            setHintNotice(await searchNomenclatureIn1C(supplierId, newItem.name.trim()))
+            // Ответ приезжает следующим опросом очереди
+            window.setTimeout(() => setHintsOpen(true), 6000)
+        } catch (e) {
+            setHintNotice(e instanceof Error ? e.message : String(e))
+        }
+    }
     // Храним ввод строкой: Number('') превращался в 0, поле само собой
     // заполнялось нулем, и стереть его было невозможно
     const handleItemAmountChange = (e: ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, amount: e.target.value })
@@ -211,6 +246,7 @@ const InvoiceForPayment = () => {
         setFormData({ ...formData, items: copyItems })
         setErrors(prev => ({ ...prev, items: '' }))
         setNewItem(EMPTY_ITEM)
+        setHintsOpen(false)
     }
 
     const handleEditNewItem = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
@@ -230,6 +266,7 @@ const InvoiceForPayment = () => {
         e.stopPropagation()
         setFormData({ ...formData, items: formData.items.filter(i => i.id !== selectedItem.id) })
         setNewItem(EMPTY_ITEM)
+        setHintsOpen(false)
     }
 
     const handleTextInputChange = (
@@ -290,6 +327,20 @@ const InvoiceForPayment = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData, supplierId, buyer, manual, account, contractId])
+
+    // Подсказки ищем на сервере: номенклатура лежит у нас, в 1С не ходим
+    useEffect(() => {
+        if (!supplierId || !hintsOpen) return
+
+        const text = newItem.name.trim()
+        const timer = window.setTimeout(() => {
+            fetchNomenclature(supplierId, text, buyer ? buyer.id : undefined)
+                .then(setHints)
+                .catch(() => setHints([]))
+        }, 300)
+
+        return () => window.clearTimeout(timer)
+    }, [newItem.name, supplierId, buyer, hintsOpen])
 
     useEffect(() => {
         if (selectedItem.id === undefined) return
@@ -602,8 +653,46 @@ const InvoiceForPayment = () => {
                                 type="text"
                                 value={newItem.name}
                                 onChange={handleItemNameChange}
+                                onFocus={() => setHintsOpen(true)}
                                 placeholder="Наименование товара/услуги"
+                                autoComplete="off"
                             />
+
+                            {/* Подсказки из 1С: частые услуги вверху, цена
+                                подставляется по последней продаже */}
+                            {hintsOpen && hints.length > 0 && (
+                                <div className="search-results">
+                                    {hints.map(hint => (
+                                        <button
+                                            key={hint.id}
+                                            type="button"
+                                            className="search-item"
+                                            onClick={() => applyHint(hint)}
+                                        >
+                                            <span>
+                                                {hint.name}
+                                                <span className="tile-hint" style={{ display: 'block' }}>
+                                                    {hint.unit || 'шт'}
+                                                    {hint.price !== null
+                                                        ? ` · ${hint.price.toLocaleString('ru-RU')} ₽${hint.priceForBuyer ? ' для этого покупателя' : ''}`
+                                                        : ''}
+                                                </span>
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {hintsOpen && newItem.name.trim().length >= 3 && !hints.length && (
+                                <>
+                                    <span className="hint">Среди недавних позиций такого нет</span>
+                                    <button type="button" className="tg-button secondary" onClick={askOneC}>
+                                        Поискать в справочнике 1С
+                                    </button>
+                                </>
+                            )}
+
+                            {hintNotice && <span className="hint">{hintNotice}</span>}
                         </div>
 
                         <div className="input-row">
