@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 
 import {
+    counterpartyStatus,
     createCounterparty,
     fetchCounterparties,
     ICounterparty,
@@ -69,14 +70,43 @@ const CounterpartyPicker = ({ organizationId, selected, onSelect, onClear, label
         setBusy(true)
         setCreateError('')
         try {
-            setNotice(await createCounterparty({
+            const created = await createCounterparty({
                 organizationId,
                 inn,
                 kpp: draft.kpp,
                 name: draft.name,
                 address: draft.address,
-            }))
+            })
+            setNotice(created.msg)
             setLookup(null)
+
+            // 1С отвечает через несколько секунд. Дожидаемся и сразу
+            // подставляем контрагента: искать его заново неудобно
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+                await new Promise(resolve => window.setTimeout(resolve, 2000))
+
+                const state = await counterpartyStatus(created.uuid)
+
+                if (state.failed) {
+                    setCreateError(state.error || 'Не удалось завести контрагента в 1С')
+                    setNotice('')
+
+                    return
+                }
+
+                if (state.ready && state.counterparty) {
+                    onSelect(state.counterparty)
+                    setCreating(false)
+                    setNotice('')
+                    setQuery('')
+                    setFound([])
+
+                    return
+                }
+            }
+
+            // Не дождались: заявка не потеряна, ответ придет в чат
+            setNotice('Заявка ушла в 1С. Как только контрагент появится, выберите его в поиске')
         } catch (e) {
             setCreateError(e instanceof Error ? e.message : String(e))
         } finally {
@@ -248,7 +278,7 @@ const CounterpartyPicker = ({ organizationId, selected, onSelect, onClear, label
                                 disabled={busy || !draft.name.trim()}
                                 onClick={onCreate}
                             >
-                                {busy ? 'Отправляем в 1С...' : 'Завести контрагента'}
+                                {busy ? 'Заводим в 1С, подождите...' : 'Завести контрагента'}
                             </button>
                         </>
                     )}

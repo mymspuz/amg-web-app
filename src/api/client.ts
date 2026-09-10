@@ -961,12 +961,27 @@ export const createCounterparty = async (input: {
     name: string
     fullName?: string
     address?: string
-}): Promise<string> => {
+}): Promise<{ uuid: string, msg: string }> => {
     try {
-        const { data } = await api.post<{ status: boolean, msg: string }>('/counterparties', input)
+        const { data } = await api.post<{ status: boolean, uuid: string, msg: string }>('/counterparties', input)
 
-        return data.msg
+        return { uuid: data.uuid, msg: data.msg }
     } catch (error) {
         throw new Error(errorText(error))
     }
+}
+
+// Готов ли контрагент: 1С отвечает через несколько секунд, поэтому
+// приложение опрашивает состояние и подставляет карточку само
+export const counterpartyStatus = async (uuid: string): Promise<{
+    ready: boolean
+    failed: boolean
+    error?: string
+    counterparty?: ICounterparty
+}> => {
+    const { data } = await api.get<{
+        status: boolean, ready: boolean, failed: boolean, error?: string, counterparty?: ICounterparty
+    }>('/counterparties/status', { params: { uuid } })
+
+    return data
 }
