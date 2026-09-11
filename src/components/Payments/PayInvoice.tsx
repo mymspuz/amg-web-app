@@ -45,7 +45,7 @@ const PayInvoice = () => {
         setUploading(true)
         setError('')
         try {
-            const uuid = await uploadInvoice(file, payerId)
+            const uuid = await uploadInvoice(file, payerId, account)
             navigate(`/Request/${uuid}`)
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err))

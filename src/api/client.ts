@@ -301,10 +301,16 @@ export const fetchRequestEvents = async (uuid: string): Promise<IRequestEvent[]>
 }
 
 // Загрузка счета из приложения: файл уходит на разбор, дальше - карточка
-export const uploadInvoice = async (file: File, organizationId: number): Promise<string> => {
+export const uploadInvoice = async (
+    file: File,
+    organizationId: number,
+    // С какого счета платим: 1С заполнит им банк плательщика в платежке
+    fromAccount?: string
+): Promise<string> => {
     const form = new FormData()
     form.append('file', file)
     form.append('organizationId', String(organizationId))
+    if (fromAccount) form.append('fromAccount', fromAccount)
 
     try {
         const { data } = await api.post<{ status: boolean, uuid: string }>('/payments/upload', form)
