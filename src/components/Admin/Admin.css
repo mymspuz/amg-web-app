@@ -36,3 +36,17 @@
 .admin-steps li {
     margin-bottom: 4px;
 }
+
+/* Организация пользователя и отметка основной в одну строку */
+.admin-org {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.admin-org .btn {
+    margin: 0;
+    padding: 2px 8px;
+    font-size: 12px;
+}

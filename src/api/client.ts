@@ -832,6 +832,15 @@ export const grantAdminAccess = async (
     }
 }
 
+// Основная организация - ее бот подставляет, когда организация не выбрана явно
+export const setAdminDefaultOrganization = async (userId: number, organizationId: number): Promise<void> => {
+    try {
+        await api.post(`/admin/users/${userId}/default`, { organizationId })
+    } catch (error) {
+        throw new Error(errorText(error))
+    }
+}
+
 export const revokeAdminAccess = async (userId: number, organizationId: number): Promise<void> => {
     try {
         await api.post(`/admin/users/${userId}/revoke`, { organizationId })

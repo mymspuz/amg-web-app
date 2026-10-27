@@ -24,6 +24,7 @@ import {
     retryAdminRequest,
     revokeAdminAccess,
     rotateAdminBaseToken,
+    setAdminDefaultOrganization,
     syncAdminBase,
     updateAdminOrganization,
     updateAdminUser,
@@ -366,11 +367,29 @@ const Admin = () => {
                             </div>
 
                             <div className="tax-line">Роль: {ROLE_TITLES[user.global_role] || user.global_role}</div>
-                            <div className="tax-line">
-                                Организации: {user.organizations.length
-                                    ? user.organizations.map(o => `${o.name} (${o.permissions.join(', ')})`).join('; ')
-                                    : 'нет доступа'}
-                            </div>
+                            {user.organizations.length === 0 && <div className="tax-line">Организации: нет доступа</div>}
+                            {/* Основную бот подставляет, когда организация не выбрана явно.
+                                Без нее при нескольких организациях запрос падает с ошибкой */}
+                            {user.organizations.map(o => (
+                                <div key={o.id} className="tax-line admin-org">
+                                    <span>{o.name} ({o.permissions.join(', ')})</span>
+                                    {o.isDefault ? (
+                                        <span className="badge accent">основная</span>
+                                    ) : user.organizations.length > 1 && (
+                                        <button
+                                            className="btn ghost"
+                                            onClick={() => act(() => setAdminDefaultOrganization(user.id, o.id))}
+                                        >
+                                            Сделать основной
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            {user.organizations.length > 1 && !user.organizations.some(o => o.isDefault) && (
+                                <div className="tax-line" style={{ color: '#b45309' }}>
+                                    Основная организация не выбрана
+                                </div>
+                            )}
 
                             <div className="tax-actions">
                                 <select
