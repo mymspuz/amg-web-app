@@ -27,6 +27,8 @@ interface IItem {
     amount: number
     price: number
     unit: string
+    // Позиция из подсказок - в 1С уйдет ссылкой на номенклатуру
+    nomenclatureId?: number
 }
 
 // То, что человек набирает в полях. Количество и цена здесь строки:
@@ -37,7 +39,11 @@ interface IItemInput {
     amount: string
     price: string
     unit: string
+    nomenclatureId?: number
 }
+
+// Ставки НДС в счете. 22% - с 2026 года
+const VAT_RATES = [22, 20, 10, 7, 5, 0]
 
 const EMPTY_ITEM: IItemInput = { id: 0, name: '', price: '', amount: '1', unit: 'шт' }
 
@@ -116,6 +122,8 @@ const InvoiceForPayment = () => {
     const [selectedItem, setSelectedItem] = useState<IItem>({} as IItem)
     const [newItem, setNewItem] = useState<IItemInput>(EMPTY_ITEM)
     const [permittedOperations, setPermittedOperations] = useState<TPermittedOperations>('none')
+    // '' - ставка организации, 'none' - без НДС, иначе ставка
+    const [vatChoice, setVatChoice] = useState<string>('')
 
     const supplier = organizations.find(o => o.id === supplierId) || null
     // Счет выбирает пользователь: у организации их бывает несколько,
@@ -194,7 +202,8 @@ const InvoiceForPayment = () => {
     }
 
     const handleItemNameChange = (e: ChangeEvent<HTMLInputElement>) => {
-        setNewItem({ ...newItem, name: e.target.value })
+        // Наименование поменяли - это уже не позиция из подсказки
+        setNewItem({ ...newItem, name: e.target.value, nomenclatureId: undefined })
         setHintsOpen(true)
         setHintNotice('')
     }
@@ -206,6 +215,7 @@ const InvoiceForPayment = () => {
             name: hint.name,
             unit: hint.unit || 'шт',
             price: hint.price === null ? newItem.price : String(hint.price),
+            nomenclatureId: hint.id,
         })
         setHintsOpen(false)
     }
@@ -250,7 +260,14 @@ const InvoiceForPayment = () => {
 
         const lastId = formData.items.length ? formData.items[formData.items.length - 1].id : 0
         const copyItems = [...formData.items]
-        copyItems.push({ id: lastId + 1, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт' })
+        copyItems.push({
+            id: lastId + 1,
+            name: newItem.name.trim(),
+            amount,
+            price,
+            unit: newItem.unit || 'шт',
+            nomenclatureId: newItem.nomenclatureId,
+        })
         setFormData({ ...formData, items: copyItems })
         setErrors(prev => ({ ...prev, items: '' }))
         setNewItem(EMPTY_ITEM)
@@ -264,7 +281,7 @@ const InvoiceForPayment = () => {
 
         const copyItems = formData.items.map(i => (
             i.id === selectedItem.id
-                ? { ...i, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт' }
+                ? { ...i, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт', nomenclatureId: newItem.nomenclatureId }
                 : i
         ))
         setFormData({ ...formData, items: copyItems })
@@ -321,7 +338,14 @@ const InvoiceForPayment = () => {
                 counterpartyId: buyer ? buyer.id : 0,
                 fromFile: formData.fromFile,
                 basis: formData.basis,
-                items: formData.items.map(i => ({ name: i.name, amount: i.amount, price: i.price, unit: i.unit || 'шт' })),
+                items: formData.items.map(i => ({
+                    name: i.name,
+                    amount: i.amount,
+                    price: i.price,
+                    unit: i.unit || 'шт',
+                    nomenclatureId: i.nomenclatureId,
+                })),
+                vatRate: vatChoice === '' ? undefined : vatChoice === 'none' ? 'none' : Number(vatChoice),
                 buyerName: buyer ? buyer.name : formData.buyerName,
                 buyerInn: buyer ? (buyer.inn || '') : formData.buyerInn,
                 buyerKpp: buyer ? (buyer.kpp || '') : formData.buyerKpp,
@@ -334,7 +358,7 @@ const InvoiceForPayment = () => {
             setSendError(e instanceof Error ? e.message : String(e))
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData, supplierId, buyer, manual, account, contractId])
+    }, [formData, supplierId, buyer, manual, account, contractId, vatChoice])
 
     // Подсказки ищем на сервере: номенклатура лежит у нас, в 1С не ходим
     useEffect(() => {
@@ -359,6 +383,7 @@ const InvoiceForPayment = () => {
             unit: selectedItem.unit,
             amount: String(selectedItem.amount ?? ''),
             price: String(selectedItem.price ?? ''),
+            nomenclatureId: selectedItem.nomenclatureId,
         })
     }, [selectedItem])
 
@@ -384,6 +409,9 @@ const InvoiceForPayment = () => {
     }, [onSendData])
 
     const total = formData.items.reduce((sum, i) => sum + i.amount * i.price, 0)
+    // НДС «в том числе»: ставка выбранная или организации
+    const vatRate = vatChoice === '' ? (supplier?.vatRate ?? null) : vatChoice === 'none' ? null : Number(vatChoice)
+    const vatAmount = vatRate ? Math.round(total * vatRate / (100 + vatRate) * 100) / 100 : 0
 
     return (
         <div className="form-container">
@@ -780,7 +808,23 @@ const InvoiceForPayment = () => {
                             }
                         </div>
 
-                        {total > 0 && <p className="muted">Итого: {total.toLocaleString('ru-RU')} ₽</p>}
+                        <div className="input-group">
+                            <label htmlFor="invoiceVat">НДС</label>
+                            <select id="invoiceVat" value={vatChoice} onChange={(e) => setVatChoice(e.target.value)}>
+                                <option value="">
+                                    Как у организации ({supplier?.vatRate ? `${supplier.vatRate}%` : 'без НДС'})
+                                </option>
+                                <option value="none">Без НДС</option>
+                                {VAT_RATES.map(r => <option key={r} value={String(r)}>{r}%</option>)}
+                            </select>
+                        </div>
+
+                        {total > 0 && (
+                            <p className="muted">
+                                Итого: {total.toLocaleString('ru-RU')} ₽
+                                {vatRate ? ` · в т.ч. НДС ${vatRate}%: ${vatAmount.toLocaleString('ru-RU')} ₽` : ' · без НДС'}
+                            </p>
+                        )}
                     </fieldset>
                 }
 

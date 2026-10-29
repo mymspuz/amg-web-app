@@ -9,11 +9,13 @@ import {
     fetchOrganizations,
     ICounterparty,
     IOrganizationDetails,
+    IPaymentDetails,
     TPaymentKind,
 } from '../../api/client'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
+import SupplierPaymentDetails from './SupplierPaymentDetails'
 
 interface IKindInfo {
     title: string
@@ -67,6 +69,8 @@ const NewPayment = () => {
     const [organizationId, setOrganizationId] = useState<number>(0)
     const [counterparty, setCounterparty] = useState<ICounterparty | null>(null)
     const [file, setFile] = useState<File | null>(null)
+    // Договор, статья ДДС и НДС - только для оплаты поставщику
+    const [details, setDetails] = useState<IPaymentDetails>({})
     const [sending, setSending] = useState(false)
     const [error, setError] = useState('')
 
@@ -130,6 +134,7 @@ const NewPayment = () => {
                 toAccount: form.toAccount,
                 employeeName: form.employeeName,
                 employeeAccount: form.employeeAccount,
+                ...(kind === 'supplier' ? details : {}),
             }, file)
 
             // Дальше - общая карточка подтверждения
@@ -140,7 +145,7 @@ const NewPayment = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [kind, organizationId, form, counterparty, file])
+    }, [kind, organizationId, form, counterparty, file, details])
 
     useEffect(() => {
         return showMainButton('Продолжить', onSend)
@@ -344,6 +349,15 @@ const NewPayment = () => {
                         />
                     </div>
                 </fieldset>
+
+                {kind === 'supplier' && (
+                    <SupplierPaymentDetails
+                        organizationId={organizationId}
+                        counterpartyId={counterparty?.id || null}
+                        sum={Number(form.sum) || null}
+                        onChange={setDetails}
+                    />
+                )}
 
                 {/* Ведомость и счет читает бухгалтер: разбирать такие файлы
                     мы пока не умеем, поэтому заявка уйдет ему на проверку */}

@@ -76,6 +76,10 @@ export interface IChatState {
         invoiceNumber: string | null
         fromAccount: string | null
         defaultComment: string
+        // Поставщик в справочнике базы - по нему грузим договоры
+        counterpartyId: number | null
+        // НДС из итогов счета: rate null - без НДС, сам vat null - не нашли
+        vat: { rate: number | null, amount: number } | null
     }
 }
 
@@ -90,7 +94,10 @@ export interface IInvoiceRequest {
     fromFile: boolean
     // Основание печатается в шапке счета: договор или разовая поставка
     basis: string
-    items: { name: string, amount: number, price: number, unit: string }[]
+    // nomenclatureId - позиция выбрана из подсказок и уйдет в 1С ссылкой
+    items: { name: string, amount: number, price: number, unit: string, nomenclatureId?: number }[]
+    // Ставка НДС: число, 'none' - без НДС
+    vatRate?: number | 'none'
     buyerName: string
     buyerInn: string
     buyerKpp: string
@@ -122,6 +129,8 @@ export interface IOrganizationDetails extends IOrganization {
     kpp: string | null
     address: string | null
     phone: string | null
+    // Ставка НДС по умолчанию для счета покупателю; null - без НДС
+    vatRate: number | null
     accounts: IBankAccount[]
 }
 
@@ -129,7 +138,16 @@ export interface IOrganizationDetails extends IOrganization {
 // и между своими счетами вводят только руками
 export type TPaymentKind = 'self_card' | 'supplier' | 'between_accounts' | 'salary'
 
-export interface IPaymentDraft {
+// Реквизиты платежки поставщику: договор, статья ДДС и НДС. vatRate -
+// ставка числом, 'none' - без НДС, пусто - не указана
+export interface IPaymentDetails {
+    contractId?: number
+    cashflowItemId?: number
+    vatRate?: number | 'none'
+    vatSum?: number
+}
+
+export interface IPaymentDraft extends IPaymentDetails {
     kind: TPaymentKind
     organizationId: number
     sum?: string
@@ -159,6 +177,15 @@ export const createPayment = async (draft: IPaymentDraft, file?: File | null): P
     } catch (error) {
         throw new Error(errorText(error))
     }
+}
+
+// Статьи движения денежных средств базы организации
+export const fetchCashflowItems = async (organizationId: number): Promise<{ id: number, name: string }[]> => {
+    const { data } = await api.get<{ status: boolean, items: { id: number, name: string }[] }>('/cashflow-items', {
+        params: { organizationId },
+    })
+
+    return data.items
 }
 
 export const fetchOrganizations = async (): Promise<IOrganizationDetails[]> => {
@@ -196,9 +223,13 @@ export const acceptConsent = async (): Promise<void> => {
     }
 }
 
-export const sendPaymentOrder = async (comment: string, organizationId: number): Promise<void> => {
+export const sendPaymentOrder = async (
+    comment: string,
+    organizationId: number,
+    details: IPaymentDetails = {}
+): Promise<void> => {
     try {
-        await api.post('/payment-order', { comment, organizationId })
+        await api.post('/payment-order', { comment, organizationId, ...details })
     } catch (error) {
         throw new Error(errorText(error))
     }

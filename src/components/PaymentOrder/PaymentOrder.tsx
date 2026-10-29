@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import '../../theme/forms1c.css'
 import './PaymentOrder.css'
 
-import { sendPaymentOrder } from '../../api/client'
+import { IPaymentDetails, sendPaymentOrder } from '../../api/client'
+import SupplierPaymentDetails from '../Payments/SupplierPaymentDetails'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
@@ -25,6 +26,7 @@ const PaymentOrder = () => {
     const [error, setError] = useState<string>('')
     const [sending, setSending] = useState<boolean>(false)
     const [comment, setComment] = useState<string>('')
+    const [details, setDetails] = useState<IPaymentDetails>({})
 
     // Назначение подставляем один раз: состояние обновляется в фоне
     // раз в полминуты и не должно стирать то, что человек уже исправил
@@ -42,7 +44,7 @@ const PaymentOrder = () => {
         setSending(true)
         setError('')
         try {
-            await sendPaymentOrder(comment, payer.id)
+            await sendPaymentOrder(comment, payer.id, details)
             // Документ придет в чат отдельным сообщением
             onClose()
         } catch (e) {
@@ -51,7 +53,7 @@ const PaymentOrder = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [comment, payer?.id])
+    }, [comment, payer?.id, details])
 
     // Отправляем по главной кнопке Telegram, если она доступна
     useEffect(() => {
@@ -110,6 +112,16 @@ const PaymentOrder = () => {
                     </fieldset>
                 )}
 
+                {invoice && payer && (
+                    <SupplierPaymentDetails
+                        organizationId={payer.id}
+                        counterpartyId={invoice.counterpartyId}
+                        sum={invoice.sum}
+                        recognizedVat={invoice.vat}
+                        onChange={setDetails}
+                    />
+                )}
+
                 {state && !invoice && (
                     <div className="error-message">
                         Нет данных счета. Пришлите счет боту и дождитесь проверки реквизитов.
@@ -134,6 +146,7 @@ const PaymentOrder = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setComment(e.target.value)}
                             placeholder="Оплата по счету"
                         />
+                        <span className="hint">Строка об НДС добавится сама, если ее нет в назначении</span>
                     </div>
 
                     {/* В Telegram отправку делает родная кнопка внизу окна */}
