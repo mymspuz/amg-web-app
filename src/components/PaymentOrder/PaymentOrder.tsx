@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
+import React, { useState, ChangeEvent, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import '../../theme/forms1c.css'
@@ -8,38 +8,41 @@ import { sendPaymentOrder } from '../../api/client'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 
-interface IFormData {
-    clientId: string
-    comment: string
-}
-
+// Платежка по счету, который уже проверен в 1С. Это всегда оплата поставщику:
+// раньше здесь был выбор «Себе на карту / Перевести на счет», по умолчанию
+// стоял первый пункт, и его название уходило в назначение платежа
 const PaymentOrder = () => {
     const navigate = useNavigate()
     const { onClose, showMainButton, hasMainButton } = useTelegram()
-    const { state, loading, organization, can } = useAppState()
+    const { state, loading, organization: headerOrganization } = useAppState()
 
-    const clients = [
-        { id: '1', name: 'Себе на карту' },
-        { id: '2', name: 'Перевести на счет' },
-    ]
+    const invoice = state?.hasInvoice ? state.invoice : null
+
+    // Плательщик - организация, с которой загружали счет, а не выбранная
+    // в шапке приложения: у сотрудника организаций несколько
+    const payer = state?.organizations.find(o => o.id === invoice?.organizationId) || headerOrganization
 
     const [error, setError] = useState<string>('')
     const [sending, setSending] = useState<boolean>(false)
-    const [formData, setFormData] = useState<IFormData>({
-        clientId: clients[0].id,
-        comment: '',
-    })
+    const [comment, setComment] = useState<string>('')
+
+    // Назначение подставляем один раз: состояние обновляется в фоне
+    // раз в полминуты и не должно стирать то, что человек уже исправил
+    const commentFilled = useRef(false)
+    useEffect(() => {
+        if (commentFilled.current || !invoice) return
+
+        commentFilled.current = true
+        setComment(invoice.defaultComment)
+    }, [invoice])
 
     const onSendData = useCallback(async () => {
-        if (!organization) return setError('Не выбрана организация')
+        if (!payer) return setError('Не выбрана организация')
 
         setSending(true)
         setError('')
         try {
-            await sendPaymentOrder(
-                formData.comment || clients.find(c => c.id === formData.clientId)?.name || '',
-                organization.id
-            )
+            await sendPaymentOrder(comment, payer.id)
             // Документ придет в чат отдельным сообщением
             onClose()
         } catch (e) {
@@ -48,7 +51,7 @@ const PaymentOrder = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData, organization])
+    }, [comment, payer?.id])
 
     // Отправляем по главной кнопке Telegram, если она доступна
     useEffect(() => {
@@ -62,15 +65,7 @@ const PaymentOrder = () => {
         navigate('/')
     }
 
-    function onChangeClient(e: { target: { value: any } }) {
-        setFormData({ ...formData, clientId: e.target.value })
-    }
-
-    function handleCommentChange(e: ChangeEvent<HTMLInputElement>) {
-        setFormData({ ...formData, comment: e.target.value })
-    }
-
-    const canConfirm = can('confirm')
+    const canConfirm = Boolean(payer?.permissions.includes('confirm'))
 
     return (
         <div className="form-container">
@@ -83,40 +78,45 @@ const PaymentOrder = () => {
                 >
                     ‹
                 </button>
-                <h1>📋 Создание <strong>пп</strong></h1>
-                <p>Заполните форму для создания нового платежного поручения</p>
+                <h1>🏭 Оплата поставщику</h1>
+                <p>Платежное поручение по проверенному счету</p>
             </div>
 
             <form className="adaptive-form">
                 {loading && <p>Загрузка...</p>}
 
-                {organization && (
+                {payer && (
                     <fieldset className="form-section">
                         <legend>🏢 Плательщик</legend>
                         <div className="input-group">
-                            <h3>{organization.name}</h3>
-                            <h4>ИНН {organization.inn}</h4>
+                            <h3>{payer.name}</h3>
+                            <h4>ИНН {payer.inn}</h4>
+                            {invoice?.fromAccount && <h4>Счет списания {invoice.fromAccount}</h4>}
                         </div>
                     </fieldset>
                 )}
 
-                {state?.hasInvoice && (
+                {invoice && (
                     <fieldset className="form-section">
                         <legend>👤 Получатель</legend>
                         <div className="input-group">
-                            <h3>ИНН {state.invoice.supplierINN}</h3>
-                            <h4>На сумму {state.invoice.sum}</h4>
+                            {invoice.supplierName && <h3>{invoice.supplierName}</h3>}
+                            <h4>ИНН {invoice.supplierINN}</h4>
+                            <h4>
+                                На сумму {invoice.sum}
+                                {invoice.invoiceNumber ? ` · счет № ${invoice.invoiceNumber}` : ''}
+                            </h4>
                         </div>
                     </fieldset>
                 )}
 
-                {state && !state.hasInvoice && (
+                {state && !invoice && (
                     <div className="error-message">
                         Нет данных счета. Пришлите счет боту и дождитесь проверки реквизитов.
                     </div>
                 )}
 
-                {state && !canConfirm && (
+                {state && payer && !canConfirm && (
                     <div className="error-message">
                         Нет права подтверждать платежи по этой организации.
                     </div>
@@ -126,28 +126,15 @@ const PaymentOrder = () => {
 
                 <fieldset className="form-section">
                     <div className="input-group">
+                        <label htmlFor="comment">Назначение платежа</label>
                         <input
-                            id="itemName"
+                            id="comment"
                             type="text"
-                            value={formData.comment}
-                            onChange={handleCommentChange}
-                            placeholder="Назначение платежа"
-                            className={''}
+                            value={comment}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setComment(e.target.value)}
+                            placeholder="Оплата по счету"
                         />
                     </div>
-                    <label htmlFor="buyer" className="required">
-                        Тип платежа
-                    </label>
-                    <select
-                        id="buyer"
-                        value={formData.clientId}
-                        onChange={onChangeClient}
-                        className={''}
-                    >
-                        {clients.map(i => (
-                            <option key={i.id} value={i.id}>{i.name}</option>
-                        ))}
-                    </select>
 
                     {/* В Telegram отправку делает родная кнопка внизу окна */}
                     {!hasMainButton && (
@@ -155,7 +142,7 @@ const PaymentOrder = () => {
                             type="button"
                             className="tg-button primary"
                             onClick={onSendData}
-                            disabled={sending || !state?.hasInvoice || !canConfirm}
+                            disabled={sending || !invoice || !canConfirm}
                         >
                             {sending ? 'Отправляем...' : 'Создать платежное поручение'}
                         </button>

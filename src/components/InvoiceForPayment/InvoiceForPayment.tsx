@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect, useCallback } from 'react'
+import React, { useState, ChangeEvent, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useTelegram } from '../../hooks/useTelegram'
@@ -126,20 +126,28 @@ const InvoiceForPayment = () => {
         || supplier?.accounts[0]
         || null
 
+    // Выбор пользователя не перезаписываем. Раньше каждое обновление
+    // состояния приложения (раз в полминуты) возвращало организацию из шапки
+    // и ее основной счет - счет уходил от другой организации и банка
+    const touched = useRef(false)
+
     useEffect(() => {
         fetchOrganizations()
-            .then((list) => {
-                setOrganizations(list)
-                // Подставляем ту организацию, что выбрана в шапке приложения
-                const preferred = list.find(o => o.id === organization?.id) || list.find(o => o.isDefault) || list[0]
-                if (preferred) {
-                    setSupplierId(preferred.id)
-                    const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
-                    setAccountNumber(first ? first.account : '')
-                }
-            })
+            .then(setOrganizations)
             .catch(e => setSendError(e instanceof Error ? e.message : String(e)))
-    }, [organization])
+    }, [])
+
+    useEffect(() => {
+        if (touched.current || !organizations.length) return
+
+        // Подставляем ту организацию, что выбрана в шапке приложения
+        const preferred = organizations.find(o => o.id === organization?.id)
+            || organizations.find(o => o.isDefault)
+            || organizations[0]
+        setSupplierId(preferred.id)
+        const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        setAccountNumber(first ? first.account : '')
+    }, [organizations, organization?.id])
 
     const loadContracts = useCallback(async (counterpartyId: number) => {
         if (!counterpartyId || !supplierId) return
@@ -402,6 +410,7 @@ const InvoiceForPayment = () => {
                             id="supplier"
                             value={supplierId}
                             onChange={(e) => {
+                                touched.current = true
                                 const id = Number(e.target.value)
                                 setSupplierId(id)
                                 const next = organizations.find(o => o.id === id)
@@ -424,7 +433,10 @@ const InvoiceForPayment = () => {
                             <select
                                 id="supplierAccount"
                                 value={account ? account.account : ''}
-                                onChange={(e) => setAccountNumber(e.target.value)}
+                                onChange={(e) => {
+                                    touched.current = true
+                                    setAccountNumber(e.target.value)
+                                }}
                             >
                                 {supplier.accounts.map(a => (
                                     <option key={a.account} value={a.account}>

@@ -82,30 +82,35 @@ const NewPayment = () => {
     })
 
     const payer = organizations.find(o => o.id === organizationId) || null
+    // Плательщика и счет, выбранные пользователем, обновление состояния
+    // приложения (раз в полминуты) больше не перезаписывает
+    const touched = useRef(false)
 
     useEffect(() => {
         fetchOrganizations()
-            .then((list) => {
-                setOrganizations(list)
-                const fromUrl = Number(search.get('org')) || 0
-                const preferred = list.find(o => o.id === fromUrl)
-                    || list.find(o => o.id === organization?.id)
-                    || list.find(o => o.isDefault)
-                    || list[0]
-
-                if (preferred) {
-                    setOrganizationId(preferred.id)
-                    // Счет списания: выбранный на прошлом шаге или основной
-                    const chosen = search.get('account')
-                    const known = chosen && preferred.accounts.some(a => a.account === chosen)
-                    setForm(f => ({
-                        ...f,
-                        fromAccount: known ? (chosen as string) : (preferred.accounts[0]?.account || ''),
-                    }))
-                }
-            })
+            .then(setOrganizations)
             .catch(e => setError(e instanceof Error ? e.message : String(e)))
-    }, [organization, search])
+    }, [])
+
+    useEffect(() => {
+        if (touched.current || !organizations.length) return
+
+        const fromUrl = Number(search.get('org')) || 0
+        const preferred = organizations.find(o => o.id === fromUrl)
+            || organizations.find(o => o.id === organization?.id)
+            || organizations.find(o => o.isDefault)
+            || organizations[0]
+
+        setOrganizationId(preferred.id)
+        // Счет списания: выбранный на прошлом шаге или основной
+        const chosen = search.get('account')
+        const known = chosen && preferred.accounts.some(a => a.account === chosen)
+        const main = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        setForm(f => ({
+            ...f,
+            fromAccount: known ? (chosen as string) : (main?.account || ''),
+        }))
+    }, [organizations, organization?.id, search])
 
     const onSend = useCallback(async () => {
         if (!kind || !organizationId) return setError('Не выбрана организация')
@@ -175,10 +180,12 @@ const NewPayment = () => {
                             id="payer"
                             value={organizationId}
                             onChange={(e) => {
+                                touched.current = true
                                 const id = Number(e.target.value)
                                 setOrganizationId(id)
                                 const next = organizations.find(o => o.id === id)
-                                setForm(f => ({ ...f, fromAccount: next?.accounts[0]?.account || '' }))
+                                const main = next?.accounts.find(a => a.isDefault) || next?.accounts[0]
+                                setForm(f => ({ ...f, fromAccount: main?.account || '' }))
                             }}
                         >
                             {!organizations.length && <option value={0}>Организации не загружены</option>}
@@ -192,7 +199,14 @@ const NewPayment = () => {
                     {Boolean(payer?.accounts.length) && (
                         <div className="input-group">
                             <label htmlFor="fromAccount">Счет списания</label>
-                            <select id="fromAccount" value={form.fromAccount} onChange={set('fromAccount')}>
+                            <select
+                                id="fromAccount"
+                                value={form.fromAccount}
+                                onChange={(e) => {
+                                    touched.current = true
+                                    set('fromAccount')(e)
+                                }}
+                            >
                                 {payer?.accounts.map(a => (
                                     <option key={a.account} value={a.account}>
                                         {a.account}{a.bankName ? ` · ${a.bankName}` : ''}

@@ -69,6 +69,13 @@ export interface IChatState {
         supplierINN: string | null
         buyerINN: string | null
         sum: number | null
+        // Организация, с которой загружали счет: с нее и платим
+        organizationId: number | null
+        supplierName: string | null
+        buyerName: string | null
+        invoiceNumber: string | null
+        fromAccount: string | null
+        defaultComment: string
     }
 }
 

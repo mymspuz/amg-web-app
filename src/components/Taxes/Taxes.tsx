@@ -68,7 +68,10 @@ const Taxes = () => {
             })
             .catch((e) => setError(e?.response?.data?.error || 'Не удалось получить налоговые данные'))
             .finally(() => setLoading(false))
-    }, [organization, scope, stateLoading])
+    // По id, а не по объекту: объект пересоздается каждым фоновым
+    // обновлением состояния, и раздел перезагружался раз в полминуты
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [organization?.id, scope, stateLoading])
 
     useEffect(() => load(), [load])
 

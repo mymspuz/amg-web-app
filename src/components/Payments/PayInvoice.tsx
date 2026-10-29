@@ -21,20 +21,27 @@ const PayInvoice = () => {
     const [organizations, setOrganizations] = useState<IOrganizationDetails[]>([])
     const [payerId, setPayerId] = useState<number>(0)
     const [account, setAccount] = useState<string>('')
+    // Выбор пользователя не трогаем: состояние приложения обновляется раз
+    // в полминуты, и раньше каждое обновление возвращало счет по умолчанию -
+    // в том числе пока шло распознавание загруженного счета
+    const touched = useRef(false)
 
     useEffect(() => {
         fetchOrganizations()
-            .then((list) => {
-                setOrganizations(list)
-                const preferred = list.find(o => o.id === organization?.id) || list.find(o => o.isDefault) || list[0]
-                if (preferred) {
-                    setPayerId(preferred.id)
-                    const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
-                    setAccount(first ? first.account : '')
-                }
-            })
+            .then(setOrganizations)
             .catch(e => setError(e instanceof Error ? e.message : String(e)))
-    }, [organization])
+    }, [])
+
+    useEffect(() => {
+        if (touched.current || !organizations.length) return
+
+        const preferred = organizations.find(o => o.id === organization?.id)
+            || organizations.find(o => o.isDefault)
+            || organizations[0]
+        setPayerId(preferred.id)
+        const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        setAccount(first ? first.account : '')
+    }, [organizations, organization?.id])
 
     const payer = organizations.find(o => o.id === payerId) || null
 
@@ -75,6 +82,7 @@ const PayInvoice = () => {
                         id="payer"
                         value={payerId}
                         onChange={(e) => {
+                            touched.current = true
                             const id = Number(e.target.value)
                             setPayerId(id)
                             const next = organizations.find(o => o.id === id)
@@ -92,7 +100,14 @@ const PayInvoice = () => {
                 {Boolean(payer?.accounts.length) && (
                     <div className="input-group" style={{ padding: '0 12px 10px' }}>
                         <label htmlFor="payerAccount">Счёт списания</label>
-                        <select id="payerAccount" value={account} onChange={(e) => setAccount(e.target.value)}>
+                        <select
+                            id="payerAccount"
+                            value={account}
+                            onChange={(e) => {
+                                touched.current = true
+                                setAccount(e.target.value)
+                            }}
+                        >
                             {payer?.accounts.map(a => (
                                 <option key={a.account} value={a.account}>
                                     {a.account}{a.bankName ? ` · ${a.bankName}` : ''}

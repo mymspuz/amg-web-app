@@ -75,7 +75,10 @@ const Reconciliation = () => {
         } else {
             loadActs()
         }
-    }, [organization, isReport, loadActs])
+    // По id: объект организации пересоздается каждым фоновым обновлением
+    // состояния, и выбранный счет отчета сбрасывался раз в полминуты
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [organization?.id, isReport, loadActs])
 
     const onSend = async () => {
         if (!organization) return setError('Не выбрана организация')
