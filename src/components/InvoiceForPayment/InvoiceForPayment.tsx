@@ -20,6 +20,7 @@ import {
     syncContracts,
 } from '../../api/client'
 import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
+import { accountLabel, isDigitalAccount, preferredAccount, sortAccounts } from '../../data/accounts'
 
 interface IItem {
     id: number
@@ -27,6 +28,9 @@ interface IItem {
     amount: number
     price: number
     unit: string
+    // Текст строки в печатной форме: договор, период, объект.
+    // Пусто - печатается наименование номенклатуры
+    content?: string
     // Позиция из подсказок - в 1С уйдет ссылкой на номенклатуру
     nomenclatureId?: number
 }
@@ -39,13 +43,14 @@ interface IItemInput {
     amount: string
     price: string
     unit: string
+    content: string
     nomenclatureId?: number
 }
 
 // Ставки НДС в счете. 22% - с 2026 года
 const VAT_RATES = [22, 20, 10, 7, 5, 0]
 
-const EMPTY_ITEM: IItemInput = { id: 0, name: '', price: '', amount: '1', unit: 'шт' }
+const EMPTY_ITEM: IItemInput = { id: 0, name: '', price: '', amount: '1', unit: 'шт', content: '' }
 
 interface IFormData {
     // Основание печатается в шапке счета
@@ -129,9 +134,9 @@ const InvoiceForPayment = () => {
     // Счет выбирает пользователь: у организации их бывает несколько,
     // и покупатель должен платить именно на нужный
     const [accountNumber, setAccountNumber] = useState<string>('')
-    const account = supplier?.accounts.find(a => a.account === accountNumber)
-        || supplier?.accounts.find(a => a.isDefault)
-        || supplier?.accounts[0]
+    const supplierAccounts = supplier ? sortAccounts(supplier.accounts) : []
+    const account = supplierAccounts.find(a => a.account === accountNumber)
+        || preferredAccount(supplierAccounts)
         || null
 
     // Выбор пользователя не перезаписываем. Раньше каждое обновление
@@ -153,7 +158,7 @@ const InvoiceForPayment = () => {
             || organizations.find(o => o.isDefault)
             || organizations[0]
         setSupplierId(preferred.id)
-        const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        const first = preferredAccount(preferred.accounts)
         setAccountNumber(first ? first.account : '')
     }, [organizations, organization?.id])
 
@@ -266,6 +271,7 @@ const InvoiceForPayment = () => {
             amount,
             price,
             unit: newItem.unit || 'шт',
+            content: newItem.content.trim(),
             nomenclatureId: newItem.nomenclatureId,
         })
         setFormData({ ...formData, items: copyItems })
@@ -281,7 +287,15 @@ const InvoiceForPayment = () => {
 
         const copyItems = formData.items.map(i => (
             i.id === selectedItem.id
-                ? { ...i, name: newItem.name.trim(), amount, price, unit: newItem.unit || 'шт', nomenclatureId: newItem.nomenclatureId }
+                ? {
+                    ...i,
+                    name: newItem.name.trim(),
+                    amount,
+                    price,
+                    unit: newItem.unit || 'шт',
+                    content: newItem.content.trim(),
+                    nomenclatureId: newItem.nomenclatureId,
+                }
                 : i
         ))
         setFormData({ ...formData, items: copyItems })
@@ -343,6 +357,7 @@ const InvoiceForPayment = () => {
                     amount: i.amount,
                     price: i.price,
                     unit: i.unit || 'шт',
+                    content: (i.content || '').trim() || undefined,
                     nomenclatureId: i.nomenclatureId,
                 })),
                 vatRate: vatChoice === '' ? undefined : vatChoice === 'none' ? 'none' : Number(vatChoice),
@@ -383,6 +398,7 @@ const InvoiceForPayment = () => {
             unit: selectedItem.unit,
             amount: String(selectedItem.amount ?? ''),
             price: String(selectedItem.price ?? ''),
+            content: selectedItem.content || '',
             nomenclatureId: selectedItem.nomenclatureId,
         })
     }, [selectedItem])
@@ -442,7 +458,7 @@ const InvoiceForPayment = () => {
                                 const id = Number(e.target.value)
                                 setSupplierId(id)
                                 const next = organizations.find(o => o.id === id)
-                                const first = next?.accounts.find(a => a.isDefault) || next?.accounts[0]
+                                const first = preferredAccount(next?.accounts || [])
                                 setAccountNumber(first ? first.account : '')
                             }}
                         >
@@ -455,7 +471,7 @@ const InvoiceForPayment = () => {
 
                     {/* Расчетный счет выбирает пользователь: на него покупатель
                         и будет платить, и его реквизиты попадут в шапку счета */}
-                    {supplier && supplier.accounts.length > 0 && (
+                    {supplier && supplierAccounts.length > 0 && (
                         <div className="input-group">
                             <label htmlFor="supplierAccount" className="required">Расчётный счёт</label>
                             <select
@@ -466,13 +482,17 @@ const InvoiceForPayment = () => {
                                     setAccountNumber(e.target.value)
                                 }}
                             >
-                                {supplier.accounts.map(a => (
+                                {supplierAccounts.map(a => (
                                     <option key={a.account} value={a.account}>
-                                        {a.account}{a.bankName ? ` · ${a.bankName}` : ''}
+                                        {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
                                     </option>
                                 ))}
                             </select>
-                            <span className="hint">На этот счёт покупатель перечислит оплату</span>
+                            <span className="hint">
+                                {supplierAccounts.some(isDigitalAccount)
+                                    ? 'На этот счёт покупатель перечислит оплату. Счёт цифрового рубля — в конце списка'
+                                    : 'На этот счёт покупатель перечислит оплату'}
+                            </span>
                         </div>
                     )}
 
@@ -678,6 +698,9 @@ const InvoiceForPayment = () => {
                                                 onClick={() => handleSelectedItem(item)}
                                             >
                                                 {item.name} · {item.amount} {item.unit} × {item.price}
+                                                {item.content
+                                                    ? <span className="tile-hint" style={{ display: 'block' }}>{item.content}</span>
+                                                    : null}
                                             </button>
                                         ))}
                                     </div>
@@ -733,6 +756,20 @@ const InvoiceForPayment = () => {
                             )}
 
                             {hintNotice && <span className="hint">{hintNotice}</span>}
+                        </div>
+
+                        <div className="input-group">
+                            <label htmlFor="itemContent">Текст в счёте</label>
+                            <textarea
+                                id="itemContent"
+                                rows={3}
+                                value={newItem.content}
+                                onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
+                                placeholder="Услуги рекламы по договору №12 от 01.10.2026 за октябрь 2026 г."
+                            />
+                            <span className="hint">
+                                Этот текст попадёт в печатную форму. Если оставить пустым, напечатается наименование номенклатуры
+                            </span>
                         </div>
 
                         <div className="input-row">

@@ -95,7 +95,7 @@ export interface IInvoiceRequest {
     // Основание печатается в шапке счета: договор или разовая поставка
     basis: string
     // nomenclatureId - позиция выбрана из подсказок и уйдет в 1С ссылкой
-    items: { name: string, amount: number, price: number, unit: string, nomenclatureId?: number }[]
+    items: { name: string, amount: number, price: number, unit: string, content?: string, nomenclatureId?: number }[]
     // Ставка НДС: число, 'none' - без НДС
     vatRate?: number | 'none'
     buyerName: string
@@ -117,6 +117,7 @@ export interface ICounterparty {
 }
 
 export interface IBankAccount {
+    externalId?: string | null
     account: string
     bik: string | null
     bankName: string | null

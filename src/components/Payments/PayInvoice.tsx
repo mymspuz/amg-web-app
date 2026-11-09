@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import '../../theme/theme1c.css'
 
 import { fetchOrganizations, IOrganizationDetails, uploadInvoice } from '../../api/client'
+import { accountLabel, preferredAccount, sortAccounts } from '../../data/accounts'
 import { useAppState } from '../../hooks/useAppState'
 
 // Оплата счета начинается с документа: загрузить прямо здесь или прислать
@@ -39,7 +40,7 @@ const PayInvoice = () => {
             || organizations.find(o => o.isDefault)
             || organizations[0]
         setPayerId(preferred.id)
-        const first = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        const first = preferredAccount(preferred.accounts)
         setAccount(first ? first.account : '')
     }, [organizations, organization?.id])
 
@@ -86,7 +87,7 @@ const PayInvoice = () => {
                             const id = Number(e.target.value)
                             setPayerId(id)
                             const next = organizations.find(o => o.id === id)
-                            const first = next?.accounts.find(a => a.isDefault) || next?.accounts[0]
+                            const first = preferredAccount(next?.accounts || [])
                             setAccount(first ? first.account : '')
                         }}
                     >
@@ -108,9 +109,9 @@ const PayInvoice = () => {
                                 setAccount(e.target.value)
                             }}
                         >
-                            {payer?.accounts.map(a => (
+                            {sortAccounts(payer?.accounts || []).map(a => (
                                 <option key={a.account} value={a.account}>
-                                    {a.account}{a.bankName ? ` · ${a.bankName}` : ''}
+                                    {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
                                 </option>
                             ))}
                         </select>

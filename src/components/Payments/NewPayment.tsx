@@ -16,6 +16,7 @@ import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
 import SupplierPaymentDetails from './SupplierPaymentDetails'
+import { accountLabel, preferredAccount, sortAccounts } from '../../data/accounts'
 
 interface IKindInfo {
     title: string
@@ -109,7 +110,7 @@ const NewPayment = () => {
         // Счет списания: выбранный на прошлом шаге или основной
         const chosen = search.get('account')
         const known = chosen && preferred.accounts.some(a => a.account === chosen)
-        const main = preferred.accounts.find(a => a.isDefault) || preferred.accounts[0]
+        const main = preferredAccount(preferred.accounts)
         setForm(f => ({
             ...f,
             fromAccount: known ? (chosen as string) : (main?.account || ''),
@@ -189,7 +190,7 @@ const NewPayment = () => {
                                 const id = Number(e.target.value)
                                 setOrganizationId(id)
                                 const next = organizations.find(o => o.id === id)
-                                const main = next?.accounts.find(a => a.isDefault) || next?.accounts[0]
+                                const main = preferredAccount(next?.accounts || [])
                                 setForm(f => ({ ...f, fromAccount: main?.account || '' }))
                             }}
                         >
@@ -212,9 +213,9 @@ const NewPayment = () => {
                                     set('fromAccount')(e)
                                 }}
                             >
-                                {payer?.accounts.map(a => (
+                                {sortAccounts(payer?.accounts || []).map(a => (
                                     <option key={a.account} value={a.account}>
-                                        {a.account}{a.bankName ? ` · ${a.bankName}` : ''}
+                                        {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
                                     </option>
                                 ))}
                             </select>
@@ -280,11 +281,11 @@ const NewPayment = () => {
                             <label htmlFor="toAccount" className="required">Куда переводим</label>
                             <select id="toAccount" value={form.toAccount} onChange={set('toAccount')}>
                                 <option value="">Выберите счет</option>
-                                {payer?.accounts
+                                {sortAccounts(payer?.accounts || [])
                                     .filter(a => a.account !== form.fromAccount)
                                     .map(a => (
                                         <option key={a.account} value={a.account}>
-                                            {a.account}{a.bankName ? ` · ${a.bankName}` : ''}
+                                            {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
                                         </option>
                                     ))}
                             </select>
