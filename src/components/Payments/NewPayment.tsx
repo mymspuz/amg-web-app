@@ -6,7 +6,10 @@ import '../InvoiceForPayment/InvoiceForPayment.css'
 
 import {
     createPayment,
+    fetchCounterpartyAccounts,
     fetchOrganizations,
+    fetchTransferAccounts,
+    IBankAccount,
     ICounterparty,
     IOrganizationDetails,
     IPaymentDetails,
@@ -15,7 +18,7 @@ import {
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
 import CounterpartyPicker from '../Counterparty/CounterpartyPicker'
-import SupplierPaymentDetails from './SupplierPaymentDetails'
+import SupplierPaymentDetails, { CashflowField } from './SupplierPaymentDetails'
 import { accountLabel, preferredAccount, sortAccounts } from '../../data/accounts'
 
 interface IKindInfo {
@@ -70,8 +73,13 @@ const NewPayment = () => {
     const [organizationId, setOrganizationId] = useState<number>(0)
     const [counterparty, setCounterparty] = useState<ICounterparty | null>(null)
     const [file, setFile] = useState<File | null>(null)
-    // Договор, статья ДДС и НДС - только для оплаты поставщику
+    // Договор, статья ДДС и НДС - для оплаты поставщику.
+    // Статью в остальных видах выбирают отдельно
     const [details, setDetails] = useState<IPaymentDetails>({})
+    const [cashflowItemId, setCashflowItemId] = useState(0)
+    const [supplierAccounts, setSupplierAccounts] = useState<IBankAccount[]>([])
+    const [transferAccounts, setTransferAccounts] = useState<IBankAccount[]>([])
+    const [otherDestination, setOtherDestination] = useState(false)
     const [sending, setSending] = useState(false)
     const [error, setError] = useState('')
 
@@ -135,7 +143,7 @@ const NewPayment = () => {
                 toAccount: form.toAccount,
                 employeeName: form.employeeName,
                 employeeAccount: form.employeeAccount,
-                ...(kind === 'supplier' ? details : {}),
+                ...(kind === 'supplier' ? details : { cashflowItemId: cashflowItemId || undefined }),
             }, file)
 
             // Дальше - общая карточка подтверждения
@@ -146,12 +154,38 @@ const NewPayment = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [kind, organizationId, form, counterparty, file, details])
+    }, [kind, organizationId, form, counterparty, file, details, cashflowItemId])
 
     useEffect(() => {
         return showMainButton('Продолжить', onSend)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onSend])
+
+    useEffect(() => {
+        if (kind !== 'supplier' || !counterparty || !organizationId) {
+            setSupplierAccounts([])
+            return
+        }
+
+        fetchCounterpartyAccounts(counterparty.id, organizationId)
+            .then((accounts) => {
+                setSupplierAccounts(accounts)
+                const main = accounts.find(a => a.isDefault) || accounts[0]
+                setForm(f => ({ ...f, supplierAccount: main?.account || '' }))
+            })
+            .catch(() => setSupplierAccounts([]))
+    }, [kind, counterparty, organizationId])
+
+    useEffect(() => {
+        if (kind !== 'self_card' || !organizationId) {
+            setTransferAccounts([])
+            return
+        }
+
+        fetchTransferAccounts(organizationId)
+            .then(setTransferAccounts)
+            .catch(() => setTransferAccounts([]))
+    }, [kind, organizationId])
 
     if (!info) {
         return (
@@ -164,8 +198,12 @@ const NewPayment = () => {
         )
     }
 
-    const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setForm({ ...form, [field]: e.target.value })
+
+    const destinations = sortAccounts(transferAccounts).filter(a => a.account !== form.fromAccount)
+    const typedAccount = form.toAccount.replace(/\s/g, '')
+    const accountKnown = destinations.some(a => a.account.replace(/\s/g, '') === typedAccount)
 
     return (
         <div className="form-container">
@@ -191,7 +229,8 @@ const NewPayment = () => {
                                 setOrganizationId(id)
                                 const next = organizations.find(o => o.id === id)
                                 const main = preferredAccount(next?.accounts || [])
-                                setForm(f => ({ ...f, fromAccount: main?.account || '' }))
+                                setOtherDestination(false)
+                                setForm(f => ({ ...f, fromAccount: main?.account || '', toAccount: '', supplierAccount: '' }))
                             }}
                         >
                             {!organizations.length && <option value={0}>Организации не загружены</option>}
@@ -237,6 +276,26 @@ const NewPayment = () => {
                             onClear={() => setCounterparty(null)}
                             label="Найдите получателя по названию или ИНН"
                         />
+                        {counterparty && (
+                            <div className="input-group">
+                                <label htmlFor="supplierAccount" className="required">Расчётный счёт поставщика</label>
+                                {supplierAccounts.length ? (
+                                    <select
+                                        id="supplierAccount"
+                                        value={form.supplierAccount}
+                                        onChange={set('supplierAccount')}
+                                    >
+                                        {sortAccounts(supplierAccounts).map(a => (
+                                            <option key={a.account} value={a.account}>
+                                                {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <span className="hint">В 1С у поставщика нет расчётного счёта</span>
+                                )}
+                            </div>
+                        )}
                         {!counterparty && (
                             <div className="input-group">
                                 <label htmlFor="supplierINN">Либо впишите ИНН вручную</label>
@@ -254,23 +313,60 @@ const NewPayment = () => {
                     </fieldset>
                 )}
 
-                {/* Карта обычно не заведена в 1С банковским счетом, поэтому
-                    номер вводится строкой: если счет найдется - подставим
-                    ссылкой, если нет - номер уйдет в назначение платежа */}
                 {kind === 'self_card' && (
                     <fieldset className="form-section">
                         <legend>💰 Куда переводим</legend>
                         <div className="input-group">
-                            <label htmlFor="toAccount">Номер карты или счета</label>
-                            <input
+                            <label htmlFor="toAccount" className="required">Счёт зачисления</label>
+                            <select
                                 id="toAccount"
-                                type="text"
-                                inputMode="numeric"
-                                value={form.toAccount}
-                                onChange={set('toAccount')}
-                                placeholder="40817810..."
-                            />
+                                value={otherDestination ? '__other' : form.toAccount}
+                                onChange={(e) => {
+                                    if (e.target.value === '__other') {
+                                        setOtherDestination(true)
+                                        setForm(f => ({ ...f, toAccount: '' }))
+                                        return
+                                    }
+                                    setOtherDestination(false)
+                                    set('toAccount')(e)
+                                }}
+                            >
+                                <option value="">Выберите счёт</option>
+                                {destinations.map(a => (
+                                    <option key={a.account} value={a.account}>
+                                        {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
+                                    </option>
+                                ))}
+                                <option value="__other">Другой счёт</option>
+                            </select>
+                            <span className="hint">
+                                Личные счета предпринимателя. Расчётные счета организации здесь не показываются
+                            </span>
                         </div>
+                        {otherDestination && (
+                            <div className="input-group">
+                                <label htmlFor="otherAccount">Номер счёта</label>
+                                <input
+                                    id="otherAccount"
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={form.toAccount}
+                                    onChange={set('toAccount')}
+                                    placeholder="40817810..."
+                                />
+                                {typedAccount.length >= 20 && !accountKnown && (
+                                    <span className="hint">
+                                        Этого счёта нет в справочнике 1С. Банк получателя в платёжке останется пустым,
+                                        а номер попадёт только в назначение. Заведите карту в банковских счетах ИП
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {!destinations.length && (
+                            <span className="hint">
+                                Кроме счёта списания у ИП в 1С нет других счетов. Карту нужно завести в справочнике
+                            </span>
+                        )}
                     </fieldset>
                 )}
 
@@ -341,13 +437,14 @@ const NewPayment = () => {
                     </div>
                     <div className="input-group">
                         <label htmlFor="comment">Назначение платежа</label>
-                        <input
+                        <textarea
                             id="comment"
-                            type="text"
+                            rows={3}
                             value={form.comment}
                             onChange={set('comment')}
                             placeholder={kind === 'self_card' ? 'Перевод собственных средств' : 'Оплата по договору'}
                         />
+                        <span className="hint">Строка «Сумма …» добавится сама, перед текстом про НДС</span>
                     </div>
                 </fieldset>
 
@@ -357,6 +454,14 @@ const NewPayment = () => {
                         counterpartyId={counterparty?.id || null}
                         sum={Number(form.sum) || null}
                         onChange={setDetails}
+                    />
+                )}
+
+                {kind && kind !== 'supplier' && (
+                    <CashflowField
+                        organizationId={organizationId}
+                        value={cashflowItemId}
+                        onChange={setCashflowItemId}
                     />
                 )}
 

@@ -2,6 +2,39 @@ import React, { useEffect, useRef, useState } from 'react'
 
 import { fetchCashflowItems, fetchContracts, IContract, IPaymentDetails } from '../../api/client'
 
+// Статья движения денег. Раньше ее спрашивали только при оплате поставщику,
+// и в остальных платежках 1С оставляла поле пустым
+export const CashflowField = ({ organizationId, value, onChange }: {
+    organizationId: number
+    value: number
+    onChange: (id: number) => void
+}) => {
+    const [items, setItems] = useState<{ id: number, name: string }[]>([])
+
+    useEffect(() => {
+        if (!organizationId) return
+
+        fetchCashflowItems(organizationId)
+            .then(setItems)
+            .catch(() => setItems([]))
+    }, [organizationId])
+
+    return (
+        <fieldset className="form-section">
+            <legend>Статья расходов</legend>
+            <div className="input-group">
+                <label htmlFor="cashflowItem">Статья движения денежных средств</label>
+                <select id="cashflowItem" value={value} onChange={(e) => onChange(Number(e.target.value))}>
+                    <option value={0}>Не выбрана</option>
+                    {items.map(i => (
+                        <option key={i.id} value={i.id}>{i.name}</option>
+                    ))}
+                </select>
+            </div>
+        </fieldset>
+    )
+}
+
 interface IProps {
     organizationId: number
     // Поставщик в справочнике базы: без него договоры не загрузить

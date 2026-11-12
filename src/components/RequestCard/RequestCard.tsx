@@ -27,7 +27,7 @@ const KIND_TITLES: Record<string, string> = {
 const RequestCard = () => {
     const { uuid } = useParams<{ uuid: string }>()
     const navigate = useNavigate()
-    const { onClose, showMainButton, hasMainButton } = useTelegram()
+    const { onClose, showMainButton, hideMainButton, hasMainButton } = useTelegram()
 
     const [request, setRequest] = useState<IRequestCard | null>(null)
     const [events, setEvents] = useState<IRequestEvent[]>([])
@@ -35,6 +35,7 @@ const RequestCard = () => {
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
     const [error, setError] = useState('')
+    const [done, setDone] = useState('')
 
     useEffect(() => {
         if (!uuid) return
@@ -59,6 +60,8 @@ const RequestCard = () => {
     // Платеж себе или между своими счетами обходится без ИНН получателя,
     // поэтому проверяем только то, что относится к виду операции
     const needsCounterparty = !request?.paymentKind || request.paymentKind === 'supplier'
+    const needsApproval = Boolean(request?.warnings?.some(w => w.level === 'strong'))
+    const confirmText = needsApproval ? 'Отправить на согласование' : 'Подтвердить и отправить в 1С'
 
     const validate = (): string => {
         if (!Number(form.sum)) return 'Укажите сумму'
@@ -80,13 +83,17 @@ const RequestCard = () => {
         setSending(true)
         setError('')
         try {
-            await confirmRequest(uuid as string, {
+            const result = await confirmRequest(uuid as string, {
                 supplierINN: form.supplierINN,
                 buyerINN: form.buyerINN,
                 sum: Number(form.sum),
                 comment: form.comment,
             })
-            onClose()
+            hideMainButton()
+            setRequest(prev => prev ? { ...prev, editable: false } : prev)
+            setDone(result.msg || (result.needsApproval
+                ? 'Заявка отправлена на согласование бухгалтеру, в 1С она пока не ушла.'
+                : 'Заявка отправлена в 1С. Ответ придет в чат.'))
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e))
         } finally {
@@ -98,7 +105,7 @@ const RequestCard = () => {
     useEffect(() => {
         if (!request?.editable) return
 
-        return showMainButton('Подтвердить и отправить в 1С', onConfirm)
+        return showMainButton(confirmText, onConfirm)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onConfirm, request])
 
@@ -112,6 +119,18 @@ const RequestCard = () => {
     }
 
     if (loading) return <div className="form-container"><p>Загрузка...</p></div>
+
+    if (done) {
+        return (
+            <div className="form-container">
+                <div className="form-header">
+                    <h1>Готово</h1>
+                    <p>{done}</p>
+                </div>
+                <button type="button" className="tg-button primary" onClick={() => navigate('/')}>В меню</button>
+            </div>
+        )
+    }
 
     if (error && !request) {
         return (
@@ -129,6 +148,13 @@ const RequestCard = () => {
     const recognized = request?.recognized
     const changed = (field: keyof IForm): boolean =>
         Boolean(recognized && String((recognized as any)[field] ?? '') !== form[field])
+    const recognizedText = (field: keyof IForm): string => {
+        if (!recognized) return ''
+        const value = (recognized as any)[field]
+        if (value === null || value === undefined || value === '') return ''
+
+        return String(value)
+    }
 
     return (
         <div className="form-container">
@@ -170,6 +196,12 @@ const RequestCard = () => {
                         <legend>{KIND_TITLES[request.paymentKind] || 'Платеж'}</legend>
                     )}
 
+                    {request?.payload.payerName && (
+                        <div className="input-group">
+                            <span className="hint">Плательщик: {request.payload.payerName}</span>
+                        </div>
+                    )}
+
                     {needsCounterparty && (
                         <>
                             <div className="input-group">
@@ -185,7 +217,9 @@ const RequestCard = () => {
                                 {request?.payload.supplierName && (
                                     <span className="hint">{request.payload.supplierName}</span>
                                 )}
-                                {changed('supplierINN') && <span className="hint">Распознано: {recognized?.supplierINN}</span>}
+                                {changed('supplierINN') && recognizedText('supplierINN') && (
+                                    <span className="hint">Распознано: {recognizedText('supplierINN')}</span>
+                                )}
                             </div>
 
                             <div className="input-group">
@@ -198,7 +232,9 @@ const RequestCard = () => {
                                     onChange={(e) => setForm({ ...form, buyerINN: e.target.value.replace(/\D/g, '') })}
                                     disabled={!request?.editable}
                                 />
-                                {changed('buyerINN') && <span className="hint">Распознано: {recognized?.buyerINN}</span>}
+                                {changed('buyerINN') && recognizedText('buyerINN') && (
+                                    <span className="hint">Распознано: {recognizedText('buyerINN')}</span>
+                                )}
                             </div>
                         </>
                     )}
@@ -231,19 +267,27 @@ const RequestCard = () => {
                             onChange={(e) => setForm({ ...form, sum: e.target.value })}
                             disabled={!request?.editable}
                         />
-                        {changed('sum') && <span className="hint">Распознано: {recognized?.sum}</span>}
+                        {changed('sum') && recognizedText('sum') && (
+                            <span className="hint">Распознано: {recognizedText('sum')}</span>
+                        )}
                     </div>
 
                     {request?.paymentKind && (
                         <div className="input-group">
                             <label htmlFor="comment">Назначение платежа</label>
-                            <input
+                            <textarea
                                 id="comment"
-                                type="text"
+                                rows={3}
                                 value={form.comment}
                                 onChange={(e) => setForm({ ...form, comment: e.target.value })}
                                 disabled={!request?.editable}
                             />
+                            {request?.payload.supplierAccount && (
+                                <span className="hint">На счёт {request.payload.supplierAccount}</span>
+                            )}
+                            {request?.payload.toAccount && (
+                                <span className="hint">На счёт {request.payload.toAccount}</span>
+                            )}
                         </div>
                     )}
                 </fieldset>
@@ -266,7 +310,7 @@ const RequestCard = () => {
                         {/* В Telegram подтверждение делает родная кнопка внизу окна */}
                         {!hasMainButton && (
                             <button type="button" className="tg-button primary" onClick={onConfirm} disabled={sending}>
-                                {sending ? 'Отправляем...' : 'Подтвердить и отправить в 1С'}
+                                {sending ? 'Отправляем...' : confirmText}
                             </button>
                         )}
                         <button type="button" className="main-action-button" onClick={onCancel} disabled={sending}>

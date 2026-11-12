@@ -75,6 +75,8 @@ export interface IChatState {
         buyerName: string | null
         invoiceNumber: string | null
         fromAccount: string | null
+        // Счет получателя, распознанный в счете поставщика
+        supplierAccount: string | null
         defaultComment: string
         // Поставщик в справочнике базы - по нему грузим договоры
         counterpartyId: number | null
@@ -227,13 +229,36 @@ export const acceptConsent = async (): Promise<void> => {
 export const sendPaymentOrder = async (
     comment: string,
     organizationId: number,
-    details: IPaymentDetails = {}
+    details: IPaymentDetails = {},
+    supplierAccount?: string
 ): Promise<void> => {
     try {
-        await api.post('/payment-order', { comment, organizationId, ...details })
+        await api.post('/payment-order', { comment, organizationId, ...details, supplierAccount })
     } catch (error) {
         throw new Error(errorText(error))
     }
+}
+
+// Расчетные счета контрагента: из них выбирают, куда платить поставщику
+export const fetchCounterpartyAccounts = async (
+    counterpartyId: number,
+    organizationId: number
+): Promise<IBankAccount[]> => {
+    const { data } = await api.get<{ status: boolean, accounts: IBankAccount[] }>(
+        `/counterparties/${counterpartyId}/accounts`,
+        { params: { organizationId } }
+    )
+
+    return data.accounts
+}
+
+// Счета для перевода себе: организация и контрагент с тем же ИНН
+export const fetchTransferAccounts = async (organizationId: number): Promise<IBankAccount[]> => {
+    const { data } = await api.get<{ status: boolean, accounts: IBankAccount[] }>('/transfer-accounts', {
+        params: { organizationId },
+    })
+
+    return data.accounts
 }
 
 export const sendInvoice = async (invoice: IInvoiceRequest): Promise<string> => {
@@ -285,10 +310,17 @@ export const fetchRequest = async (uuid: string): Promise<IRequestCard> => {
 export const confirmRequest = async (
     uuid: string,
     values: { supplierINN: string, buyerINN: string, sum: number, comment?: string }
-): Promise<string[]> => {
+): Promise<{ corrected: string[], needsApproval: boolean, msg: string }> => {
     try {
-        const { data } = await api.post<{ status: boolean, corrected: string[] }>(`/requests/${uuid}/confirm`, values)
-        return data.corrected
+        const { data } = await api.post<{ status: boolean, corrected: string[], needsApproval: boolean, msg: string }>(
+            `/requests/${uuid}/confirm`,
+            values
+        )
+        return {
+            corrected: data.corrected || [],
+            needsApproval: Boolean(data.needsApproval),
+            msg: data.msg || '',
+        }
     } catch (error) {
         throw new Error(errorText(error))
     }

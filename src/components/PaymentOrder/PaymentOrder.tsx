@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import '../../theme/forms1c.css'
 import './PaymentOrder.css'
 
-import { IPaymentDetails, sendPaymentOrder } from '../../api/client'
+import { fetchCounterpartyAccounts, IBankAccount, IPaymentDetails, sendPaymentOrder } from '../../api/client'
+import { accountLabel, sortAccounts } from '../../data/accounts'
 import SupplierPaymentDetails from '../Payments/SupplierPaymentDetails'
 import { useAppState } from '../../hooks/useAppState'
 import { useTelegram } from '../../hooks/useTelegram'
@@ -27,6 +28,9 @@ const PaymentOrder = () => {
     const [sending, setSending] = useState<boolean>(false)
     const [comment, setComment] = useState<string>('')
     const [details, setDetails] = useState<IPaymentDetails>({})
+    const [supplierAccounts, setSupplierAccounts] = useState<IBankAccount[]>([])
+    const [supplierAccount, setSupplierAccount] = useState('')
+    const accountTouched = useRef(false)
 
     // Назначение подставляем один раз: состояние обновляется в фоне
     // раз в полминуты и не должно стирать то, что человек уже исправил
@@ -38,13 +42,32 @@ const PaymentOrder = () => {
         setComment(invoice.defaultComment)
     }, [invoice])
 
+    useEffect(() => {
+        if (!invoice?.counterpartyId || !payer) {
+            setSupplierAccounts([])
+            return
+        }
+
+        fetchCounterpartyAccounts(invoice.counterpartyId, payer.id)
+            .then((accounts) => {
+                setSupplierAccounts(accounts)
+                if (accountTouched.current) return
+
+                const wanted = (invoice.supplierAccount || '').replace(/\s/g, '')
+                const fromInvoice = accounts.find(a => a.account.replace(/\s/g, '') === wanted)
+                const main = accounts.find(a => a.isDefault) || accounts[0]
+                setSupplierAccount((fromInvoice || main)?.account || '')
+            })
+            .catch(() => setSupplierAccounts([]))
+    }, [invoice, payer])
+
     const onSendData = useCallback(async () => {
         if (!payer) return setError('Не выбрана организация')
 
         setSending(true)
         setError('')
         try {
-            await sendPaymentOrder(comment, payer.id, details)
+            await sendPaymentOrder(comment, payer.id, details, supplierAccount)
             // Документ придет в чат отдельным сообщением
             onClose()
         } catch (e) {
@@ -53,7 +76,7 @@ const PaymentOrder = () => {
             setSending(false)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [comment, payer?.id, details])
+    }, [comment, payer?.id, details, supplierAccount])
 
     // Отправляем по главной кнопке Telegram, если она доступна
     useEffect(() => {
@@ -109,6 +132,32 @@ const PaymentOrder = () => {
                                 {invoice.invoiceNumber ? ` · счет № ${invoice.invoiceNumber}` : ''}
                             </h4>
                         </div>
+                        <div className="input-group">
+                            <label htmlFor="supplierAccount">Расчётный счёт поставщика</label>
+                            {supplierAccounts.length ? (
+                                <select
+                                    id="supplierAccount"
+                                    value={supplierAccount}
+                                    onChange={(e) => {
+                                        accountTouched.current = true
+                                        setSupplierAccount(e.target.value)
+                                    }}
+                                >
+                                    {sortAccounts(supplierAccounts).map(a => (
+                                        <option key={a.account} value={a.account}>
+                                            {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="hint">Счета поставщика ещё не загружены</span>
+                            )}
+                            {invoice.supplierAccount
+                                && supplierAccount
+                                && invoice.supplierAccount.replace(/\s/g, '') !== supplierAccount.replace(/\s/g, '') && (
+                                <span className="hint">В счёте указан другой счёт: {invoice.supplierAccount}</span>
+                            )}
+                        </div>
                     </fieldset>
                 )}
 
@@ -139,14 +188,14 @@ const PaymentOrder = () => {
                 <fieldset className="form-section">
                     <div className="input-group">
                         <label htmlFor="comment">Назначение платежа</label>
-                        <input
+                        <textarea
                             id="comment"
-                            type="text"
+                            rows={3}
                             value={comment}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setComment(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
                             placeholder="Оплата по счету"
                         />
-                        <span className="hint">Строка об НДС добавится сама, если ее нет в назначении</span>
+                        <span className="hint">Строка «Сумма …» добавится сама, перед текстом про НДС</span>
                     </div>
 
                     {/* В Telegram отправку делает родная кнопка внизу окна */}

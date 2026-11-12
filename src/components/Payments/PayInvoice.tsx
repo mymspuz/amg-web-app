@@ -11,7 +11,7 @@ import { useAppState } from '../../hooks/useAppState'
 // боту в чат. Дальше в обоих случаях - карточка подтверждения реквизитов
 const PayInvoice = () => {
     const navigate = useNavigate()
-    const { state, organization, loading } = useAppState()
+    const { state, organization } = useAppState()
     const fileInput = useRef<HTMLInputElement>(null)
 
     const [uploading, setUploading] = useState(false)
@@ -141,19 +141,33 @@ const PayInvoice = () => {
             )}
 
             <div className="list-card">
-                <button
-                    className="list-item"
-                    onClick={() => fileInput.current?.click()}
-                    disabled={uploading || loading || !payerId}
-                >
-                    <span>
-                        Загрузить счёт
-                        <span className="tile-hint" style={{ display: 'block' }}>
-                            PDF, скан или фотография. Изображение распознаём, это занимает несколько секунд
+                {/* Кнопка, которая сама жмет скрытый input, в Telegram не
+                    открывает файл и выглядит неактивной. Подпись связана
+                    с полем напрямую */}
+                {payerId && !uploading ? (
+                    <label className="list-item" htmlFor="invoiceFile">
+                        <span>
+                            Загрузить счёт
+                            <span className="tile-hint" style={{ display: 'block' }}>
+                                PDF, скан или фотография. Бот разберёт реквизиты и подготовит платёжное поручение.
+                                Файл можно и переслать боту в чат
+                            </span>
                         </span>
-                    </span>
-                    <span className="badge accent">{uploading ? 'Разбираем...' : 'Выбрать файл'}</span>
-                </button>
+                        <span className="badge accent">Выбрать файл</span>
+                    </label>
+                ) : (
+                    <button className="list-item" type="button" disabled>
+                        <span>
+                            Загрузить счёт
+                            <span className="tile-hint" style={{ display: 'block' }}>
+                                {uploading
+                                    ? 'Разбираем файл, это занимает несколько секунд'
+                                    : 'Сначала выберите организацию'}
+                            </span>
+                        </span>
+                        <span className="badge">{uploading ? 'Разбираем...' : 'Выбрать файл'}</span>
+                    </button>
+                )}
 
                 <button
                     className="list-item"
@@ -167,23 +181,14 @@ const PayInvoice = () => {
                     </span>
                     <span className="badge accent">Заполнить</span>
                 </button>
-
-                <button className="list-item" disabled>
-                    <span>
-                        Отправить счёт боту в чат
-                        <span className="tile-hint" style={{ display: 'block' }}>
-                            Можно переслать документ из другого чата
-                        </span>
-                    </span>
-                    <span className="badge">В чате</span>
-                </button>
             </div>
 
             <input
+                id="invoiceFile"
                 ref={fileInput}
+                className="file-input"
                 type="file"
                 accept="application/pdf,image/*"
-                style={{ display: 'none' }}
                 onChange={onFile}
             />
         </div>

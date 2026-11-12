@@ -217,6 +217,18 @@
     cursor: default;
 }
 
+/* Не display:none: в Telegram клик по скрытому input не открывает файл */
+.file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
 .badge {
     font-size: 11px;
     padding: 2px 8px;
