@@ -116,6 +116,7 @@ const InvoiceForPayment = () => {
     const [contracts, setContracts] = useState<IContract[]>([])
     const [contractId, setContractId] = useState<number>(0)
     const [contractsComplete, setContractsComplete] = useState(true)
+    const [contractsLoaded, setContractsLoaded] = useState(false)
     const [contractsNotice, setContractsNotice] = useState('')
 
     // Подсказки номенклатуры: список собран из документов за полгода,
@@ -165,16 +166,21 @@ const InvoiceForPayment = () => {
     const loadContracts = useCallback(async (counterpartyId: number) => {
         if (!counterpartyId || !supplierId) return
 
+        setContractsLoaded(false)
         try {
-            const data = await fetchContracts(counterpartyId, supplierId)
-            setContracts(data.items)
+            const data = await fetchContracts(counterpartyId, supplierId, 'invoice')
+            // Заглушку «Без договора» не выбираем. В списке уже только
+            // договоры с покупателем, здесь отсекаем повторно
+            const buyerContracts = data.items.filter(c => !c.isStub && /покупател/i.test(c.kind || ''))
+            setContracts(buyerContracts)
             setContractsComplete(data.complete)
-            // Основной договор подставляем сам: чаще всего нужен именно он
-            const main = data.items.find(c => c.isMain) || data.items[0]
+            const main = buyerContracts.find(c => c.isMain) || buyerContracts[0]
             setContractId(main ? main.id : 0)
         } catch {
             setContracts([])
             setContractId(0)
+        } finally {
+            setContractsLoaded(true)
         }
     }, [supplierId])
 
@@ -203,6 +209,7 @@ const InvoiceForPayment = () => {
         setManual(false)
         setContracts([])
         setContractId(0)
+        setContractsLoaded(false)
         setContractsNotice('')
     }
 
@@ -644,7 +651,7 @@ const InvoiceForPayment = () => {
                                 value={contractId}
                                 onChange={(e) => setContractId(Number(e.target.value))}
                             >
-                                <option value={0}>Без договора</option>
+                                <option value={0}>1С создаст основной договор</option>
                                 {contracts.map(c => (
                                     <option key={c.id} value={c.id}>
                                         {c.title}{c.isMain ? ' · основной' : ''}
@@ -665,6 +672,12 @@ const InvoiceForPayment = () => {
                         </div>
                     )}
 
+                    {buyer && contractsLoaded && contracts.length === 0 && (
+                        <span className="hint">
+                            Договоров с покупателем нет. При выставлении счета 1С создаст основной договор.
+                        </span>
+                    )}
+
                     {contractsNotice && <div className="notice">{contractsNotice}</div>}
 
                     {/* Текстом основание задают, когда договора в 1С нет */}
@@ -678,7 +691,7 @@ const InvoiceForPayment = () => {
                                 onChange={handleTextInputChange}
                                 placeholder="Счёт-оферта, разовая поставка"
                             />
-                            <span className="muted">Если оставить пустым, в счете будет «Без договора»</span>
+                            <span className="muted">Если оставить пустым, при выставлении счета 1С создаст основной договор</span>
                         </div>
                     )}
                 </fieldset>

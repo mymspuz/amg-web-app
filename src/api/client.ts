@@ -965,16 +965,19 @@ export interface IContract {
     number: string | null
     date: string | null
     kind: string | null
+    // «Без договора» и договор с номером-ИНН организации
+    isStub?: boolean
     // Основной договор подставляется в счет по умолчанию
     isMain: boolean
 }
 
 export const fetchContracts = async (
     counterpartyId: number,
-    organizationId: number
+    organizationId: number,
+    purpose?: 'invoice'
 ): Promise<{ items: IContract[], complete: boolean }> => {
     const { data } = await api.get<{ status: boolean, items: IContract[], complete: boolean }>('/contracts', {
-        params: { counterpartyId, organizationId },
+        params: { counterpartyId, organizationId, for: purpose },
     })
 
     return { items: data.items, complete: data.complete }

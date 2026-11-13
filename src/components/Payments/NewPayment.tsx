@@ -79,6 +79,7 @@ const NewPayment = () => {
     const [cashflowItemId, setCashflowItemId] = useState(0)
     const [supplierAccounts, setSupplierAccounts] = useState<IBankAccount[]>([])
     const [transferAccounts, setTransferAccounts] = useState<IBankAccount[]>([])
+    const [transferLoaded, setTransferLoaded] = useState(false)
     const [otherDestination, setOtherDestination] = useState(false)
     const [sending, setSending] = useState(false)
     const [error, setError] = useState('')
@@ -179,12 +180,15 @@ const NewPayment = () => {
     useEffect(() => {
         if (kind !== 'self_card' || !organizationId) {
             setTransferAccounts([])
+            setTransferLoaded(kind !== 'self_card')
             return
         }
 
+        setTransferLoaded(false)
         fetchTransferAccounts(organizationId)
             .then(setTransferAccounts)
             .catch(() => setTransferAccounts([]))
+            .finally(() => setTransferLoaded(true))
     }, [kind, organizationId])
 
     if (!info) {
@@ -316,36 +320,38 @@ const NewPayment = () => {
                 {kind === 'self_card' && (
                     <fieldset className="form-section">
                         <legend>💰 Куда переводим</legend>
-                        <div className="input-group">
-                            <label htmlFor="toAccount" className="required">Счёт зачисления</label>
-                            <select
-                                id="toAccount"
-                                value={otherDestination ? '__other' : form.toAccount}
-                                onChange={(e) => {
-                                    if (e.target.value === '__other') {
-                                        setOtherDestination(true)
-                                        setForm(f => ({ ...f, toAccount: '' }))
-                                        return
-                                    }
-                                    setOtherDestination(false)
-                                    set('toAccount')(e)
-                                }}
-                            >
-                                <option value="">Выберите счёт</option>
-                                {destinations.map(a => (
-                                    <option key={a.account} value={a.account}>
-                                        {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
-                                    </option>
-                                ))}
-                                <option value="__other">Другой счёт</option>
-                            </select>
-                            <span className="hint">
-                                Личные счета предпринимателя. Расчётные счета организации здесь не показываются
-                            </span>
-                        </div>
-                        {otherDestination && (
+                        {transferLoaded && destinations.length > 0 && (
                             <div className="input-group">
-                                <label htmlFor="otherAccount">Номер счёта</label>
+                                <label htmlFor="toAccount" className="required">Счёт зачисления</label>
+                                <select
+                                    id="toAccount"
+                                    value={otherDestination ? '__other' : form.toAccount}
+                                    onChange={(e) => {
+                                        if (e.target.value === '__other') {
+                                            setOtherDestination(true)
+                                            setForm(f => ({ ...f, toAccount: '' }))
+                                            return
+                                        }
+                                        setOtherDestination(false)
+                                        set('toAccount')(e)
+                                    }}
+                                >
+                                    <option value="">Выберите счёт</option>
+                                    {destinations.map(a => (
+                                        <option key={a.account} value={a.account}>
+                                            {accountLabel(a)}{a.isDefault ? ' · основной' : ''}
+                                        </option>
+                                    ))}
+                                    <option value="__other">Другой счёт</option>
+                                </select>
+                                <span className="hint">
+                                    Личные счета предпринимателя. Расчётные счета организации здесь не показываются
+                                </span>
+                            </div>
+                        )}
+                        {transferLoaded && (destinations.length === 0 || otherDestination) && (
+                            <div className="input-group">
+                                <label htmlFor="otherAccount" className="required">Номер счёта</label>
                                 <input
                                     id="otherAccount"
                                     type="text"
@@ -354,7 +360,13 @@ const NewPayment = () => {
                                     onChange={set('toAccount')}
                                     placeholder="40817810..."
                                 />
-                                {typedAccount.length >= 20 && !accountKnown && (
+                                {destinations.length === 0 && (
+                                    <span className="hint">
+                                        В 1С нет личной карты этого ИП. Укажите номер: банк получателя в платёжке
+                                        останется пустым, а номер попадёт в назначение
+                                    </span>
+                                )}
+                                {destinations.length > 0 && typedAccount.length >= 20 && !accountKnown && (
                                     <span className="hint">
                                         Этого счёта нет в справочнике 1С. Банк получателя в платёжке останется пустым,
                                         а номер попадёт только в назначение. Заведите карту в банковских счетах ИП
@@ -362,10 +374,8 @@ const NewPayment = () => {
                                 )}
                             </div>
                         )}
-                        {!destinations.length && (
-                            <span className="hint">
-                                Кроме счёта списания у ИП в 1С нет других счетов. Карту нужно завести в справочнике
-                            </span>
+                        {!transferLoaded && (
+                            <span className="hint">Загружаем счета…</span>
                         )}
                     </fieldset>
                 )}

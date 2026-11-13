@@ -141,8 +141,22 @@ const RequestCard = () => {
         )
     }
 
-    // Не все поля могли распознаться - подскажем, что их надо дозаполнить
-    const isComplete = Boolean(form.supplierINN && form.buyerINN && form.sum)
+    // Полнота зависит от вида платежа. У перевода между своими счетами
+    // нет ИНН получателя: сумма и оба счета уже заполнены, это не ошибка
+    const hasSum = Boolean(Number(form.sum))
+    const isComplete = (() => {
+        if (!hasSum) return false
+        switch (request?.paymentKind) {
+            case 'between_accounts':
+                return Boolean(request.payload.fromAccount && request.payload.toAccount)
+            case 'self_card':
+                return Boolean(request.payload.toAccount)
+            case 'salary':
+                return true
+            default:
+                return Boolean(form.supplierINN && form.buyerINN)
+        }
+    })()
 
     // Показываем, что именно распознали, если пользователь уже правил
     const recognized = request?.recognized
